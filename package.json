@@ -1,5 +1,5 @@
 {
-  "name": "agentbridge",
+  "name": "anyagents",
   "version": "0.1.0",
   "description": "Canonical instructions, skills, and MCP configuration for Claude Code and Codex.",
   "type": "module",

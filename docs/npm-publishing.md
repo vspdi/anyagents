@@ -1,6 +1,6 @@
 # Secure npm publishing setup
 
-Package: `agentbridge`. GitHub repository: `vspdi/agentbridge`. Stable releases come from `main` with npm dist-tag `latest`; prereleases come from `dev` with dist-tag `dev`.
+Package: `anyagents`. GitHub repository: `vspdi/agentbridge`. Stable releases come from `main` with npm dist-tag `latest`; prereleases come from `dev` with dist-tag `dev`.
 
 The Release workflow creates GitHub releases independently. When `NPM_PUBLISH_ENABLED` is `true`, a separate job stages the exact same tarball for npm. Only that job has OIDC permission. It has no source checkout, project dependency installation, or package lifecycle execution. All npm candidates require human approval with npm 2FA before becoming public.
 
@@ -27,22 +27,22 @@ These protections must exist before enabling the publishing variable. npm must b
 
 ## 4. Bootstrap the new npm package locally
 
-Download the latest verified stable `agentbridge-VERSION.tgz` from the GitHub releases. Replace VERSION below with that release version. Use Node 24.15 or later in the 24.x line (or another version supported by npm 12.2.0), then run these commands on your own machine:
+Download the latest verified stable `anyagents-VERSION.tgz` from the GitHub releases. Replace VERSION below with that release version. Use Node 24.15 or later in the 24.x line (or another version supported by npm 12.2.0), then run these commands on your own machine:
 
 ```sh
 npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
 npm login
 npm whoami
-npm stage publish /absolute/path/to/agentbridge-VERSION.tgz --tag latest --access public --ignore-scripts
+npm publish /absolute/path/to/anyagents-VERSION.tgz --tag latest --access public --ignore-scripts
 ```
 
-Check that `npm whoami` shows `viktorgerbert`, the intended npm owner. The name must still be available when staging. Staging a new package creates a public `0.0.0-stage` placeholder that claims the name; the candidate contents remain private until approval. Record the stage ID returned by npm.
+Check that `npm whoami` shows `viktorgerbert`, the intended npm owner. The name must still be accepted by npm when publishing; an exact-name registry lookup cannot establish that npm will accept it. The first local publish requires npm 2FA and creates the package so its trusted publisher can be configured. New-package staging was rejected by npm with a server-side version-uniqueness error during setup, so use a normal first publish and stage-only CI afterward.
 
 This first local upload has no GitHub OIDC provenance. Later automated candidates obtain provenance when the repository is public. Do not claim provenance for a local bootstrap upload.
 
 ## 5. Configure the npm trusted publisher
 
-Open the `agentbridge` package on npm and its **Settings/Trusted Publisher** section. Add a GitHub Actions publisher with these exact values:
+Open the `anyagents` package on npm and its **Settings/Trusted Publisher** section. Add a GitHub Actions publisher with these exact values:
 
 | Field | Value |
 | --- | --- |
@@ -56,9 +56,9 @@ Open the `agentbridge` package on npm and its **Settings/Trusted Publisher** sec
 
 Enter only `release.yml`, not its directory path. Under package publishing access, select **Require two-factor authentication and disallow tokens**. Remove obsolete publishing tokens. npm explicitly supports trusted staging with these restrictions.
 
-## 6. Review and approve the first version
+## 6. Review and approve future candidates
 
-Review the candidate in npm's **Staged Packages** page, or use:
+For future CI candidates, review them in npm's **Staged Packages** page, or use:
 
 ```sh
 npm stage view STAGE_ID

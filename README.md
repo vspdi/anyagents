@@ -22,17 +22,17 @@ pnpm build
 npm pack --ignore-scripts
 ```
 
-Release tarballs use `agentbridge-VERSION.tgz`. For the first stable release, use `agentbridge-0.1.0.tgz`.
+Release tarballs use `anyagents-VERSION.tgz`. For the first stable release, use `anyagents-0.1.0.tgz`.
 
 In the repository you want to configure:
 
 ```sh
-npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge init
-npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge apply
-npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge check
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge init
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge apply
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge check
 ```
 
-After npm publication, use `npx agentbridge <command>`. The executable is `agentbridge`.
+After npm publication, use `npx anyagents <command>`. The executable is `agentbridge`.
 
 Edit canonical sources only. Run `apply` after changes and `check` in CI. Use `--source .company-ai` or `[source] dir` to choose a different source directory. CLI overrides config; config overrides defaults.
 
