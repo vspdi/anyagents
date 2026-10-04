@@ -27,10 +27,12 @@ Repository governance confirmed: one active ruleset targets both dev and main, r
 
 ## AgentBridge naming
 
-The repository is `vspdi/agentbridge`, the unscoped npm package is `anyagents`, and the CLI executable is `agentbridge`. npm publishing remains disabled pending secure publishing setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.
+The repository is `vspdi/agentbridge`, the unscoped npm package is `anyagents`, and the CLI executable is `agentbridge`. `anyagents@0.1.0` is published under npm owner `viktorgerbert`; CI staging remains disabled pending completion of the trusted publisher setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.
 
 ## Publishing security
 
 Builds bundle CLI libraries and the published package has no production dependency installs. The npm publishing job stages the tested tarball with OIDC, separately from project code and dependency installation. npm approval with 2FA is the final public-release gate. Publishing is gated by NPM_PUBLISH_ENABLED and the npm-publish environment; owner account and protection setup must precede enabling it.
 
 The unscoped npm name `agentbridge` was rejected by npm as too similar to `agent-bridge`. The user selected `anyagents` instead; repository and executable remain `agentbridge`. No scoped package fallback is authorized. The first npm publication uses an authenticated 2FA publish because new-package staging failed server-side; subsequent CI uploads are stage-only.
+
+Both dev and main release candidates require manual npm approval with 2FA. GitHub Actions summarizes the npm package link, version, channel, candidate ID, and SHA-256 so the owner can review and approve later. The workflow completes after staging; public npm publication is a separate owner action.

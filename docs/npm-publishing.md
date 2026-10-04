@@ -58,7 +58,9 @@ Enter only `release.yml`, not its directory path. Under package publishing acces
 
 ## 6. Review and approve future candidates
 
-For future CI candidates, review them in npm's **Staged Packages** page, or use:
+After a release run on either `dev` or `main`, open its **Summary**. The staging job provides a clickable [npm package link](https://www.npmjs.com/package/anyagents), the version, channel, candidate ID, and tarball SHA-256. Open the package's **Staged Packages** tab, match that candidate, review its contents, and select **Approve** when ready. npm requires your 2FA at approval time; CI does not create a short-lived CLI authorization link or wait for your browser session. The workflow finishes successfully after staging, while npm publication remains pending.
+
+You can also use:
 
 ```sh
 npm stage view STAGE_ID
@@ -66,7 +68,7 @@ npm stage download STAGE_ID
 npm stage approve STAGE_ID
 ```
 
-Confirm the package name, version, contents, and `latest` tag before approval. Approval requires npm 2FA. Staged versions reserve their version number, so reject an incorrect candidate before trying to stage the same version again.
+Confirm the package name, version, contents, and the intended tag (`latest` for `main`, `dev` for `dev`) before approval. Approval requires npm 2FA. Staged versions reserve their version number, so reject an incorrect candidate before trying to stage the same version again.
 
 ## 7. Enable automated staging
 
