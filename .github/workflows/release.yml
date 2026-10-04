@@ -113,7 +113,9 @@ jobs:
           npm stage publish "$package" --tag "$DIST_TAG" --access public --ignore-scripts --json > staged-package.json
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
-          const candidate = JSON.parse(readFileSync('staged-package.json', 'utf8'));
+          const response = JSON.parse(readFileSync('staged-package.json', 'utf8'));
+          const candidate = response.anyagents;
+          if (!candidate) throw new Error('Missing anyagents npm staging response');
           if (candidate.name !== 'anyagents' ||
               candidate.version !== process.env.RELEASE_VERSION ||
               !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate.stageId)) {
