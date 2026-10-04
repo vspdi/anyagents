@@ -1,10 +1,10 @@
 {
-  "name": "@vspdi/omniagents",
+  "name": "agentbridge",
   "version": "0.1.0",
   "description": "Canonical instructions, skills, and MCP configuration for Claude Code and Codex.",
   "type": "module",
   "bin": {
-    "omniagents": "./dist/cli.js"
+    "agentbridge": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -17,7 +17,7 @@
   "packageManager": "pnpm@10.17.1",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vspdi/omniagents.git"
+    "url": "git+https://github.com/vspdi/agentbridge.git"
   },
   "license": "MIT",
   "scripts": {

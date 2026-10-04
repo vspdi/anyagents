@@ -24,3 +24,7 @@ Initialization refuses existing authored files by default. init --force explicit
 An initial v0.0.0 baseline tag on the license-only commit lets semantic-release choose 0.1.0 for the first feature release, rather than its default 1.0.0. The baseline is not a working product release.
 
 Repository governance confirmed: one active ruleset targets both dev and main, requires PRs and GitHub Actions quality/conventional-title checks, zero mandatory approvals, no bypasses, no force pushes, and no deletions. Linear-history enforcement is off to retain branch ancestry through promotion/sync merges. Repository-wide merge options expose squash and merge; contributors select squash for feature PRs and merge for promotion/sync. GitHub cannot select the merge method based on source branch automatically.
+
+## AgentBridge naming
+
+The repository is `vspdi/agentbridge`, the unscoped npm package is `agentbridge`, and the CLI executable is `agentbridge`. npm publishing remains disabled pending secure publishing setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.

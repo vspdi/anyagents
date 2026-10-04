@@ -27,7 +27,7 @@ export async function inputs(
     if (!stat)
       fail(
         'SOURCE_NOT_FOUND',
-        'Missing canonical source. Run omniagents init or restore the asset.',
+        'Missing canonical source. Run agentbridge init or restore the asset.',
         p,
       );
   }

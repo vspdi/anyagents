@@ -37,14 +37,8 @@ try {
     ],
     temp,
   );
-  const cli = path.join(
-    temp,
-    'node_modules',
-    '@vspdi',
-    'omniagents',
-    'dist',
-    'cli.js',
-  );
+  const cli = path.join(temp, 'node_modules', 'agentbridge', 'dist', 'cli.js');
+  run('npm', ['exec', '--offline', '--', 'agentbridge', '--help'], temp);
   run(process.execPath, [cli, '--help'], temp);
   run(process.execPath, [cli, 'init', '--no-apply'], temp);
   const initialized = spawnSync(process.execPath, [cli, 'apply', '--json'], {
