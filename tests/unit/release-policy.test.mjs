@@ -23,16 +23,16 @@ it('requires conventional titles, including scopes and breaking changes', () => 
   ])
     expect(validTitle(title)).toBe(false);
   expect(
-    validFlow('dev', 'feature/test', 'vspdi/omniagents', 'vspdi/omniagents'),
+    validFlow('dev', 'feature/test', 'vspdi/agentbridge', 'vspdi/agentbridge'),
   ).toBe(true);
-  expect(validFlow('main', 'dev', 'vspdi/omniagents', 'vspdi/omniagents')).toBe(
-    true,
-  );
   expect(
-    validFlow('main', 'feature/test', 'vspdi/omniagents', 'vspdi/omniagents'),
+    validFlow('main', 'dev', 'vspdi/agentbridge', 'vspdi/agentbridge'),
+  ).toBe(true);
+  expect(
+    validFlow('main', 'feature/test', 'vspdi/agentbridge', 'vspdi/agentbridge'),
   ).toBe(false);
   expect(
-    validFlow('main', 'dev', 'attacker/omniagents', 'vspdi/omniagents'),
+    validFlow('main', 'dev', 'attacker/omniagents', 'vspdi/agentbridge'),
   ).toBe(false);
 });
 it('keeps npm publication disabled while enabling stable and dev release channels', () => {
