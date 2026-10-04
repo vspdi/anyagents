@@ -209,7 +209,6 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
       }
       if (Object.keys(existing).length) config.mcp_servers = existing;
       else delete config.mcp_servers;
-      // Only rewrite TOML when managed entries actually change. Unrelated formatting is retained on no-op.
       const changed = stable(rawServers ?? {}) !== stable(existing);
       output = current !== null && !changed ? current : stringify(config);
       managed.generated[dest] = hash(stable(servers));

@@ -10,7 +10,7 @@ Enable GitHub and npm 2FA using a security key or passkey where supported. Keep 
 
 ## 2. Decide repository visibility
 
-Trusted publishing can work from a private repository, but npm provenance requires a public repository. Make the repository public only after reviewing tracked files, Git history, release assets, and the archived handoff for private information. The workflow requests provenance for public repositories and disables it for private repositories.
+Trusted publishing can work from a private repository, but npm provenance requires a public repository. Make the repository public only after reviewing tracked files, Git history, release assets for private information. The workflow requests provenance for public repositories and disables it for private repositories.
 
 GitHub environment required reviewers are available for public repositories on Free/Pro/Team; using them for private repositories requires Enterprise. Branch deployment restrictions should still be configured wherever your plan supports environments. npm's mandatory stage approval remains the final publishing gate.
 
@@ -25,22 +25,7 @@ In GitHub, open **Settings → Environments → New environment** and name it ex
 
 These protections must exist before enabling the publishing variable. npm must bind its publisher configuration to this exact environment name; leaving the npm environment field blank would remove an important restriction.
 
-## 4. Bootstrap the new npm package locally
-
-Download the latest verified stable `anyagents-VERSION.tgz` from the GitHub releases. Replace VERSION below with that release version. Use Node 24.15 or later in the 24.x line (or another version supported by npm 12.2.0), then run these commands on your own machine:
-
-```sh
-npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
-npm login
-npm whoami
-npm publish /absolute/path/to/anyagents-VERSION.tgz --tag latest --access public --ignore-scripts
-```
-
-Check that `npm whoami` shows `viktorgerbert`, the intended npm owner. The name must still be accepted by npm when publishing; an exact-name registry lookup cannot establish that npm will accept it. The first local publish requires npm 2FA and creates the package so its trusted publisher can be configured. New-package staging was rejected by npm with a server-side version-uniqueness error during setup, so use a normal first publish and stage-only CI afterward.
-
-This first local upload has no GitHub OIDC provenance. Later automated candidates obtain provenance when the repository is public. Do not claim provenance for a local bootstrap upload.
-
-## 5. Configure the npm trusted publisher
+## 4. Configure the npm trusted publisher
 
 Open the `anyagents` package on npm and its **Settings/Trusted Publisher** section. Add a GitHub Actions publisher with these exact values:
 
@@ -56,11 +41,11 @@ Open the `anyagents` package on npm and its **Settings/Trusted Publisher** secti
 
 Enter only `release.yml`, not its directory path. Under package publishing access, select **Require two-factor authentication and disallow tokens**. Remove obsolete publishing tokens. npm explicitly supports trusted staging with these restrictions.
 
-## 6. Review and approve future candidates
+## 5. Review and approve future candidates
 
 After a release run on either `dev` or `main`, open its **Summary**. The staging job provides a clickable [npm package link](https://www.npmjs.com/package/anyagents), the version, channel, candidate ID, and tarball SHA-256. Open the package's **Staged Packages** tab, match that candidate, review its contents, and select **Approve** when ready. npm requires your 2FA at approval time; CI does not create a short-lived CLI authorization link or wait for your browser session. The workflow finishes successfully after staging, while npm publication remains pending.
 
-You can also use:
+For CLI approval, use npm 12.2.0 or later, sign in as the package owner (`viktorgerbert`), and run:
 
 ```sh
 npm stage view STAGE_ID
@@ -70,7 +55,7 @@ npm stage approve STAGE_ID
 
 Confirm the package name, version, contents, and the intended tag (`latest` for `main`, `dev` for `dev`) before approval. Approval requires npm 2FA. Staged versions reserve their version number, so reject an incorrect candidate before trying to stage the same version again.
 
-## 7. Enable automated staging
+## 6. Enable automated staging
 
 After the workflow change is merged and both the environment and trusted publisher are configured, open GitHub **Settings → Secrets and variables → Actions → Variables**. Create a repository variable:
 
@@ -89,7 +74,7 @@ Keep semantic-release's `npmPublish: false`: the isolated staging job handles np
 - Enable Dependabot alerts and security updates. The checked-in bot configuration opens dependency and Action updates against dev; review them before merging.
 - Enable secret scanning and push protection, CodeQL/code scanning, and dependency review where your plan permits. Private repository scanning may need GitHub Code Security/Secret Protection licenses; public repositories have broader free coverage. Do not assume unavailable controls are enabled.
 - Add a second trusted reviewer before requiring code-owner approval or approval from someone other than the author. CODEOWNERS identifies release-sensitive files; it does not enforce approval by itself.
-- Enable GitHub immutable releases after the initial release replacement is complete. Protect release tags against updates/deletion while allowing the release workflow to create new tags. GitHub release immutability and npm version immutability do not establish that code is benign.
+- Enable GitHub immutable releases for published release tags. Protect release tags against updates/deletion while allowing the release workflow to create new tags. GitHub release immutability and npm version immutability do not establish that code is benign.
 - Keep default Actions workflow permission read-only and disable permission for Actions to create/approve PRs. Restrict allowed Actions to the ones used here and require full commit SHA pins where GitHub exposes that policy.
 
 The npm owner still has authority to approve a malicious candidate. Staging helps against a compromised CI workflow only when you inspect what you approve and protect the owner account.
@@ -100,6 +85,6 @@ References: [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
 The publishing hardening updates Vitest to 4.1.11 and esbuild to 0.28.1, addressing their reported advisories. The bundled CLI has no install-time production dependencies; libraries are bundled during the build. One high-severity, unpatched `braces` denial-of-service advisory remains in semantic-release's development dependency tree. It concerns deeply nested glob patterns; the current release configuration uses fixed rules. Treat this as an unresolved build-tool risk, monitor its advisory, and review any change that introduces user-controlled release patterns. A clean production-dependency audit does not establish that bundled source or build dependencies are safe.
 
-## Repository renames
+## Repository maintenance
 
-The repository is now `vspdi/anyagents`. A repository rename does not rename or unpublish the npm package. Update Git remotes, package repository metadata, release identity checks, and the npm trusted publisher together. Revoke the old repository binding before enabling the replacement. Keep the workflow filename `release.yml`, environment `npm-publish`, and stage-only permissions. GitHub URL redirects do not update npm OIDC trust claims. Published npm versions remain immutable; version 0.1.0 retains its original repository metadata, while future versions use the new URL. Future versions use the `anyagents` executable. Published 0.1.0 retains its historical `agentbridge` executable; use its original binary name when installing that old tarball explicitly.
+After a repository rename, update Git remotes, package repository metadata, release identity checks, and the npm trusted publisher together. Remove the old binding before enabling its replacement. Keep the workflow filename `release.yml`, environment `npm-publish`, and stage-only permissions. GitHub URL redirects do not update npm OIDC trust claims. Published npm versions retain their original metadata.

@@ -133,8 +133,7 @@ Biome checks lint/formatting. Vitest covers canonical validation, native transfo
 
 Feature PRs target `dev` and squash. Release promotions merge `dev` into `main`; synchronization merges `main` back into `dev`. Keep Conventional Commit PR titles unchanged in merge dialogs.
 
-See [decisions](docs/decisions.md), the [original handoff](docs/handoff/00-README.md), and [release setup](docs/releasing.md).
+See [release workflow](docs/releasing.md) and [secure npm publishing](docs/npm-publishing.md).
 
 MIT © 2026 Viktor Gerbert.
 
-Secure npm setup and owner actions are documented in [docs/npm-publishing.md](docs/npm-publishing.md).

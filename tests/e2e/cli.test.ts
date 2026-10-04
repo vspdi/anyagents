@@ -13,13 +13,12 @@ const run = (...args: string[]) =>
     timeout: 10_000,
   });
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'omniagents-e2e-'));
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'anyagents-e2e-'));
   spawnSync('git', ['init'], { cwd: root });
 });
 afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
-// Hosted Windows runners need time for the many separate Node processes below.
 it(
   'executes the complete bundled CLI workflow in a temporary Git repository',
   { timeout: 30_000 },

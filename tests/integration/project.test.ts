@@ -15,7 +15,7 @@ let root: string;
 let linkSupported = true;
 beforeEach(async () => {
   root = await fs.realpath(
-    await fs.mkdtemp(path.join(os.tmpdir(), 'omniagents-test-')),
+    await fs.mkdtemp(path.join(os.tmpdir(), 'anyagents-test-')),
   );
   try {
     await fs.writeFile(path.join(root, 'probe-source'), 'probe');

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
-const temp = mkdtempSync(path.join(tmpdir(), 'omniagents-pack-'));
+const temp = mkdtempSync(path.join(tmpdir(), 'anyagents-pack-'));
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,

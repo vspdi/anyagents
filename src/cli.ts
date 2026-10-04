@@ -276,9 +276,7 @@ program
 try {
   await program.parseAsync();
 } catch (e) {
-  if (e instanceof CommanderError && e.exitCode === 0) {
-    /* help/version already printed */
-  } else {
+  if (!(e instanceof CommanderError && e.exitCode === 0)) {
     const error =
       e instanceof OmniError
         ? e

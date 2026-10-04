@@ -1,6 +1,8 @@
 # AnyAgents development
 
-Read README.md and docs/decisions.md before changing behavior. The original handoff is in docs/handoff; user decisions in docs/decisions.md supersede it.
+Read README.md before changing behavior. For release changes, read docs/releasing.md and docs/npm-publishing.md.
+
+Prefer clear names and simple control flow. Add comments only when a constraint or invariant cannot be made clear in the code.
 
 Implement one local TypeScript CLI for Claude Code and Codex. Keep canonical validation, target transforms, ownership checks, and filesystem execution distinct. Never resolve secrets, overwrite unmanaged content, mutate global configuration, or introduce background behavior.
 
