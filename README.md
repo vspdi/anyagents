@@ -14,7 +14,15 @@ AgentBridge is a local TypeScript CLI. No telemetry, cloud service, background p
 
 ## Quick start
 
-The npm package is not published yet. Download an installable `.tgz` from a GitHub release, or build it locally:
+The package is published as [`anyagents`](https://www.npmjs.com/package/anyagents). In the repository you want to configure:
+
+```sh
+npx anyagents init
+npx anyagents apply
+npx anyagents check
+```
+
+Alternatively, download an installable `.tgz` from a GitHub release, or build it locally:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -32,7 +40,7 @@ npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge apply
 npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge check
 ```
 
-After npm publication, use `npx anyagents <command>`. The executable is `agentbridge`.
+Use `npx anyagents <command>`. The executable is `agentbridge`.
 
 Edit canonical sources only. Run `apply` after changes and `check` in CI. Use `--source .company-ai` or `[source] dir` to choose a different source directory. CLI overrides config; config overrides defaults.
 

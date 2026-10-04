@@ -84,7 +84,7 @@ jobs:
           package-manager-cache: false
       - name: Install the pinned npm CLI with staging support
         run: npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
-      - name: Verify and stage the tested release package
+      - name: Stage release for manual npm approval
         shell: bash
         env:
           RELEASE_VERSION: ${{ needs.release.outputs.version }}
@@ -110,5 +110,37 @@ jobs:
               throw new Error("Unexpected package identity");
             }
           '
-          npm stage publish "$package" --tag "$DIST_TAG" --access public --ignore-scripts
-          echo "Candidate staged. Review and approve it on npm with 2FA." >> "$GITHUB_STEP_SUMMARY"
+          npm stage publish "$package" --tag "$DIST_TAG" --access public --ignore-scripts --json > staged-package.json
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const candidate = JSON.parse(readFileSync('staged-package.json', 'utf8'));
+          if (candidate.name !== 'anyagents' ||
+              candidate.version !== process.env.RELEASE_VERSION ||
+              !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate.stageId)) {
+            throw new Error('Unexpected npm staging response; inspect the staged package on npm');
+          }
+          const summary = [
+            '## npm publication awaits your approval',
+            '',
+            `[Review and approve on npm](https://www.npmjs.com/package/anyagents) — open the **Staged Packages** tab.`,
+            '',
+            `Package: **anyagents@${candidate.version}**`,
+            `Channel: **${process.env.DIST_TAG}**`,
+            `Candidate ID: \`${candidate.stageId}\``,
+            `SHA-256: \`${process.env.EXPECTED_SHA256}\``,
+            '',
+            'Review this candidate, then select **Approve** and complete npm 2FA when ready.',
+            'This workflow only stages the package; it does not publish it publicly.',
+            '',
+            'Alternatively, with npm 12.2.0 or later:',
+            '',
+            '```sh',
+            `npm stage view ${candidate.stageId}`,
+            `npm stage download ${candidate.stageId}`,
+            `npm stage approve ${candidate.stageId}`,
+            '```',
+            '',
+          ].join('\n');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(`anyagents@${candidate.version} awaits npm approval (candidate ${candidate.stageId}).`);
+          NODE
