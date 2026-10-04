@@ -1,0 +1,3 @@
+model = "user-model"
+[mcp_servers.user]
+command = "user-server"
