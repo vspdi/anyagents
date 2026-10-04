@@ -24,6 +24,10 @@ it(
   'executes the complete bundled CLI workflow in a temporary Git repository',
   { timeout: 30_000 },
   async () => {
+    const help = run('--help');
+    expect(help.status, help.stderr).toBe(0);
+    expect(help.stdout).toContain('Usage: anyagents');
+    expect(help.stdout).not.toContain('agentbridge');
     const initialized = run('init', '--json');
     if (
       initialized.status !== 0 &&

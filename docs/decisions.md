@@ -25,14 +25,16 @@ An initial v0.0.0 baseline tag on the license-only commit lets semantic-release 
 
 Repository governance confirmed: one active ruleset targets both dev and main, requires PRs and GitHub Actions quality/conventional-title checks, zero mandatory approvals, no bypasses, no force pushes, and no deletions. Linear-history enforcement is off to retain branch ancestry through promotion/sync merges. Repository-wide merge options expose squash and merge; contributors select squash for feature PRs and merge for promotion/sync. GitHub cannot select the merge method based on source branch automatically.
 
-## AgentBridge naming
+## AnyAgents naming
 
-The repository is `vspdi/anyagents`, the unscoped npm package is `anyagents`, and the CLI executable is `agentbridge`. `anyagents@0.1.0` is published under npm owner `viktorgerbert`; CI staging remains disabled pending completion of the trusted publisher setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.
+The repository is `vspdi/anyagents`, the unscoped npm package is `anyagents`, and the CLI executable is `anyagents`. `anyagents@0.1.0` is published under npm owner `viktorgerbert`; CI staging remains disabled pending completion of the trusted publisher setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.
 
 ## Publishing security
 
 Builds bundle CLI libraries and the published package has no production dependency installs. The npm publishing job stages the tested tarball with OIDC, separately from project code and dependency installation. npm approval with 2FA is the final public-release gate. Publishing is gated by NPM_PUBLISH_ENABLED and the npm-publish environment; owner account and protection setup must precede enabling it.
 
-The unscoped npm name `agentbridge` was rejected by npm as too similar to `agent-bridge`. The user selected `anyagents` instead; the executable remains `agentbridge`; the repository was subsequently renamed to `anyagents`. No scoped package fallback is authorized. The first npm publication uses an authenticated 2FA publish because new-package staging failed server-side; subsequent CI uploads are stage-only.
+The unscoped npm name `agentbridge` was rejected by npm as too similar to `agent-bridge`. The user selected `anyagents` instead; the repository and executable were subsequently renamed to `anyagents`. No scoped package fallback is authorized. The first npm publication uses an authenticated 2FA publish because new-package staging failed server-side; subsequent CI uploads are stage-only.
 
 Both dev and main release candidates require manual npm approval with 2FA. GitHub Actions summarizes the npm package link, version, channel, candidate ID, and SHA-256 so the owner can review and approve later. The workflow completes after staging; public npm publication is a separate owner action.
+
+The user requested the executable rename as well. Future versions expose only `anyagents`, with matching help text, diagnostic suggestions, and authoring guidance. Published 0.1.0 retains the historical `agentbridge` executable; it is not replaced. The executable rename is released as 0.1.1 after the initial version. Existing project configuration and ownership state paths remain compatible.

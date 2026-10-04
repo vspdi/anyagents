@@ -12,7 +12,7 @@ import { init } from './core/init.js';
 import { schemas } from './formats/canonical.js';
 
 const program = new Command()
-  .name('agentbridge')
+  .name('anyagents')
   .description('Canonical AI assets for Claude Code and Codex.')
   .version(version)
   .option('--cwd <path>', 'project root')
@@ -29,7 +29,7 @@ const program = new Command()
   .option('--no-color', 'disable ANSI colors');
 program.addHelpText(
   'after',
-  '\nAuthoring documentation:\n  agentbridge explain <authoring|skills|mcp|config|ownership>\n  agentbridge schema <config|mcp|skill|all>\n  agentbridge template <skill|mcp-stdio|mcp-http|config>',
+  '\nAuthoring documentation:\n  anyagents explain <authoring|skills|mcp|config|ownership>\n  anyagents schema <config|mcp|skill|all>\n  anyagents template <skill|mcp-stdio|mcp-http|config>',
 );
 program.exitOverride();
 program.configureOutput({ outputError: () => {} });
@@ -198,9 +198,9 @@ program
       }
     }
     diagnostics.suggestedFixes = [
-      'agentbridge explain ownership',
-      'agentbridge apply',
-      'agentbridge check',
+      'anyagents explain ownership',
+      'anyagents apply',
+      'anyagents check',
     ];
     diagnostics.warnings = ctx.warnings;
     output(diagnostics, opts);
@@ -286,7 +286,7 @@ try {
           ? new OmniError('USAGE_ERROR', e.message)
           : new OmniError(
               'APPLY_FAILED',
-              'Operation failed. Run agentbridge doctor and check filesystem permissions.',
+              'Operation failed. Run anyagents doctor and check filesystem permissions.',
             );
     if (process.argv.includes('--json'))
       process.stderr.write(

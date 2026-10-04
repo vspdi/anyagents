@@ -201,7 +201,7 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
           issue(
             plan,
             'OUTPUT_DRIFT',
-            `Codex MCP entry ${name} differs. Run agentbridge apply.`,
+            `Codex MCP entry ${name} differs. Run anyagents apply.`,
             dest,
           );
         if (Object.hasOwn(servers, name)) existing[name] = servers[name];
@@ -219,14 +219,14 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
         issue(
           plan,
           'OUTPUT_DRIFT',
-          'MCP output differs. Run agentbridge apply.',
+          'MCP output differs. Run anyagents apply.',
           dest,
         );
       if (!previous || stable(previous) !== stable(managed))
         issue(
           plan,
           'OUTPUT_DRIFT',
-          'Ownership state differs. Run agentbridge apply.',
+          'Ownership state differs. Run anyagents apply.',
           '.omniagents/state.json',
         );
     } else if (current !== output)
@@ -241,7 +241,7 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
     issue(
       plan,
       'OUTPUT_DRIFT',
-      'Canonical source changed. Run agentbridge apply.',
+      'Canonical source changed. Run anyagents apply.',
       '.omniagents/state.json',
     );
   if (!checking) {

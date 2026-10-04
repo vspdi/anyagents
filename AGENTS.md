@@ -1,4 +1,4 @@
-# AgentBridge development
+# AnyAgents development
 
 Read README.md and docs/decisions.md before changing behavior. The original handoff is in docs/handoff; user decisions in docs/decisions.md supersede it.
 
