@@ -162,6 +162,27 @@ program
     } catch {
       diagnostics.writableRoot = false;
     }
+    const writableParents: Record<string, boolean> = {};
+    for (const relative of [
+      'CLAUDE.md',
+      'AGENTS.md',
+      '.claude/skills',
+      '.agents/skills',
+      '.mcp.json',
+      '.codex/config.toml',
+      '.omniagents/state.json',
+    ]) {
+      let parent = path.dirname(path.join(ctx.root, relative));
+      await safePath(ctx.root, parent);
+      while (!(await exists(parent))) parent = path.dirname(parent);
+      try {
+        await fs.access(parent, fs.constants.W_OK);
+        writableParents[path.relative(ctx.root, parent) || '.'] = true;
+      } catch {
+        writableParents[path.relative(ctx.root, parent) || '.'] = false;
+      }
+    }
+    diagnostics.writableParents = writableParents;
     diagnostics.linkCapability = 'not probed; run doctor --probe';
     if (opts.probe) {
       const dir = path.join(ctx.root, `.omniagents-probe-${randomUUID()}`);

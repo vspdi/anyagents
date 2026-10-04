@@ -3,7 +3,7 @@ import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { fail } from '../core/errors.js';
 
-const text = z.string().min(1);
+const text = z.string().min(1).regex(/\S/, 'Expected nonblank text');
 const strings = z.record(z.string(), z.string());
 export const configSchema = z.object({
   version: z.literal(1),

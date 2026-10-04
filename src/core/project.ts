@@ -17,7 +17,14 @@ export async function inputs(
   for (const asset of ['AGENTS.md', 'mcp.toml', 'skills']) {
     const p = path.join(ctx.source, asset);
     await safePath(ctx.root, p);
-    if (!(await exists(p)))
+    const stat = await exists(p);
+    if (stat && (asset === 'skills' ? !stat.isDirectory() : !stat.isFile()))
+      fail(
+        'CONFIG_INVALID',
+        'Canonical assets must be ordinary files and a skills directory.',
+        p,
+      );
+    if (!stat)
       fail(
         'SOURCE_NOT_FOUND',
         'Missing canonical source. Run omniagents init or restore the asset.',

@@ -79,10 +79,18 @@ it('semantic-release computes 0.1.0-dev.1 and 0.1.0 from the baseline in a local
       dryRun: true,
       ci: false,
       plugins: [
-        path.resolve('node_modules/@semantic-release/commit-analyzer/index.js'),
-        path.resolve(
-          'node_modules/@semantic-release/release-notes-generator/index.js',
-        ),
+        [
+          path.resolve(
+            'node_modules/@semantic-release/commit-analyzer/index.js',
+          ),
+          { preset: 'conventionalcommits' },
+        ],
+        [
+          path.resolve(
+            'node_modules/@semantic-release/release-notes-generator/index.js',
+          ),
+          { preset: 'conventionalcommits' },
+        ],
       ],
     };
     const isolatedEnv = { ...process.env };
@@ -110,3 +118,19 @@ it('semantic-release computes 0.1.0-dev.1 and 0.1.0 from the baseline in a local
     rmSync(directory, { recursive: true, force: true });
   }
 }, 30000);
+
+it('release analysis honors Conventional Commit breaking-change markers', async () => {
+  const { analyzeCommits } = await import('@semantic-release/commit-analyzer');
+  const ctx = {
+    cwd: process.cwd(),
+    logger: { log: () => {} },
+    commits: [{ message: 'feat!: change public schema', hash: 'example' }],
+  };
+  expect(await analyzeCommits({ preset: 'conventionalcommits' }, ctx)).toBe(
+    'major',
+  );
+  ctx.commits = [{ message: 'fix(cli): repair drift', hash: 'example' }];
+  expect(await analyzeCommits({ preset: 'conventionalcommits' }, ctx)).toBe(
+    'patch',
+  );
+});
