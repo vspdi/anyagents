@@ -14,7 +14,9 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 let root: string;
 let linkSupported = true;
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'omniagents-test-'));
+  root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), 'omniagents-test-')),
+  );
   try {
     await fs.writeFile(path.join(root, 'probe-source'), 'probe');
     await fs.symlink('probe-source', path.join(root, 'probe-link'));

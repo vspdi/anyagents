@@ -99,12 +99,10 @@ export async function sourceHash(
   version: string,
 ): Promise<string> {
   const h = createHash('sha256').update(`1:${version}`);
+  const relative = (p: string) =>
+    path.relative(root, p).split(path.sep).join('/');
   for (const p of paths.sort((a, b) =>
-    path.relative(root, a) < path.relative(root, b)
-      ? -1
-      : path.relative(root, a) > path.relative(root, b)
-        ? 1
-        : 0,
+    relative(a) < relative(b) ? -1 : relative(a) > relative(b) ? 1 : 0,
   )) {
     const name = Buffer.from(path.relative(root, p).split(path.sep).join('/'));
     const bytes = await fs.readFile(p);

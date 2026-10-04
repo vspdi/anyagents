@@ -85,9 +85,17 @@ it('semantic-release computes 0.1.0-dev.1 and 0.1.0 from the baseline in a local
         ),
       ],
     };
+    const isolatedEnv = { ...process.env };
+    for (const key of Object.keys(isolatedEnv))
+      if (
+        /^(CI$|GITHUB_|RUNNER_|GITLAB_|TRAVIS|CIRCLE|APPVEYOR|BUILDKITE|JENKINS|TF_BUILD)/.test(
+          key,
+        )
+      )
+        delete isolatedEnv[key];
     const context = {
       cwd: work,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      env: { ...isolatedEnv, GIT_TERMINAL_PROMPT: '0' },
       stdout: new PassThrough(),
       stderr: new PassThrough(),
     };
