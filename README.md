@@ -119,6 +119,8 @@ npm pack --dry-run --ignore-scripts
 
 Biome checks lint/formatting. Vitest covers canonical validation, native transforms, ownership, rollback, and a bundled CLI smoke test in a temporary Git repository. The packed-install smoke test exercises an installed package independently of repository sources. CI runs Linux/macOS/Windows on Node 20/22.
 
+Feature PRs target `dev` and squash. Release promotions merge `dev` into `main`; synchronization merges `main` back into `dev`. Keep Conventional Commit PR titles unchanged in merge dialogs.
+
 See [decisions](docs/decisions.md), the [original handoff](docs/handoff/00-README.md), and [release setup](docs/releasing.md).
 
 MIT © 2026 Viktor Gerbert.

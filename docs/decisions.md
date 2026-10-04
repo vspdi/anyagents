@@ -1,6 +1,6 @@
 # Implementation decisions
 
-User-confirmed: private vspdi/omniagents; implement v0.1; TypeScript/Node 20+; MIT; Claude Code and Codex only; Biome; semantic-release; stable main, ongoing dev; dev is the default PR branch; squash-only merges with Conventional Commit PR titles; required CI and title checks; no direct pushes, admin bypass, force pushes, or required approvals. npm setup/publication waits until the package works.
+User-confirmed: private vspdi/omniagents; implement v0.1; TypeScript/Node 20+; MIT; Claude Code and Codex only; Biome; semantic-release; stable main, ongoing dev; dev is the default PR branch; squash feature PRs into dev; allow merge commits for dev-to-main promotion and main-to-dev synchronization; Conventional Commit PR titles; required CI and title checks; no direct pushes, admin bypass, force pushes, or required approvals. npm setup/publication waits until the package works.
 
 The npm name omniagents is already occupied. Package scope provisionally @vspdi/omniagents, binary omniagents. npm publication is disabled; GitHub releases attach an installable tarball. Confirm scope availability and account ownership before enabling npm.
 
@@ -22,3 +22,5 @@ Windows requires file symlink privileges (Developer Mode or suitable permissions
 Initialization refuses existing authored files by default. init --force explicitly replaces scaffold files; apply --force only repairs managed generated drift. Initialization is a separate operation: if subsequent apply conflicts, scaffold remains for inspection and repair.
 
 An initial v0.0.0 baseline tag on the license-only commit lets semantic-release choose 0.1.0 for the first feature release, rather than its default 1.0.0. The baseline is not a working product release.
+
+Repository governance confirmed: one active ruleset targets both dev and main, requires PRs and GitHub Actions quality/conventional-title checks, zero mandatory approvals, no bypasses, no force pushes, and no deletions. Linear-history enforcement is off to retain branch ancestry through promotion/sync merges. Repository-wide merge options expose squash and merge; contributors select squash for feature PRs and merge for promotion/sync. GitHub cannot select the merge method based on source branch automatically.
