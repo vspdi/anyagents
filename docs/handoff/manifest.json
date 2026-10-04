@@ -1,0 +1,20 @@
+{
+  "name": "OmniAgents v0.1 implementation handoff",
+  "formatVersion": 1,
+  "files": [
+    "00-README.md",
+    "01-product-contract.md",
+    "02-repository-and-architecture.md",
+    "03-cli-contract.md",
+    "04-canonical-formats.md",
+    "05-target-adapters.md",
+    "06-filesystem-state-and-safety.md",
+    "07-validation-and-tests.md",
+    "08-packaging-and-release.md",
+    "09-implementation-plan.md",
+    "10-agent-bootstrap-contract.md",
+    "11-decisions-and-open-questions.md",
+    "12-build-session-prompt.md"
+  ],
+  "entrypoint": "00-README.md"
+}
