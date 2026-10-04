@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
-const repo = 'vspdi/omniagents';
+const repo = 'vspdi/agentbridge';
 function api(method, route, data) {
   const result = spawnSync(
     'gh',

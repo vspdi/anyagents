@@ -11,7 +11,7 @@ export const templates: Record<string, string> = {
     'version = 1\n\n[mcp.project-docs]\ntransport = "http"\nurl = "https://example.invalid/mcp"\nheaders = { Authorization = "Bearer ${PROJECT_DOCS_TOKEN}" }\n',
 };
 export function instructions(source: string): string {
-  return `# Repository instructions\n\nAdd repository-specific guidance here.\n\n## OmniAgents authoring contract\n\nThis repository uses OmniAgents to share instructions, skills, and MCP configuration across Claude Code and Codex.\n\n- Edit \`${source}/AGENTS.md\` for shared repository instructions.\n- Add skills under \`${source}/skills/<name>/SKILL.md\`.\n- Add MCP servers to \`${source}/mcp.toml\`.\n- Configure source and targets in \`omniagents.toml\`.\n- Author canonical sources only; do not edit linked or generated native destinations.\n\nBefore authoring unfamiliar assets, run:\n\n\`\`\`sh\nnpx @vspdi/omniagents explain authoring\nnpx @vspdi/omniagents explain skills\nnpx @vspdi/omniagents explain mcp\nnpx @vspdi/omniagents schema config\nnpx @vspdi/omniagents schema mcp\nnpx @vspdi/omniagents schema skill\nnpx @vspdi/omniagents template skill\nnpx @vspdi/omniagents template mcp-stdio\n\`\`\`\n\nAfter canonical changes, run \`npx @vspdi/omniagents apply\` (or \`apply --target <current-target>\`), then \`npx @vspdi/omniagents check\`. Report changed canonical files and verification results.\n`;
+  return `# Repository instructions\n\nAdd repository-specific guidance here.\n\n## AgentBridge authoring contract\n\nThis repository uses AgentBridge to share instructions, skills, and MCP configuration across Claude Code and Codex.\n\n- Edit \`${source}/AGENTS.md\` for shared repository instructions.\n- Add skills under \`${source}/skills/<name>/SKILL.md\`.\n- Add MCP servers to \`${source}/mcp.toml\`.\n- Configure source and targets in \`omniagents.toml\`.\n- Author canonical sources only; do not edit linked or generated native destinations.\n\nBefore authoring unfamiliar assets, run:\n\n\`\`\`sh\nnpx agentbridge explain authoring\nnpx agentbridge explain skills\nnpx agentbridge explain mcp\nnpx agentbridge schema config\nnpx agentbridge schema mcp\nnpx agentbridge schema skill\nnpx agentbridge template skill\nnpx agentbridge template mcp-stdio\n\`\`\`\n\nAfter canonical changes, run \`npx agentbridge apply\` (or \`apply --target <current-target>\`), then \`npx agentbridge check\`. Report changed canonical files and verification results.\n`;
 }
 const outputs = [
   'CLAUDE.md',
@@ -46,7 +46,7 @@ function topic(
     structure,
     examples: [example],
     nativeOutputs: outputs,
-    commands: ['omniagents apply', 'omniagents check'],
+    commands: ['agentbridge apply', 'agentbridge check'],
     commonMistakes,
   };
 }

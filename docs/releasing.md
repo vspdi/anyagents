@@ -22,7 +22,7 @@ The connected integration may have content permissions without the repository Ad
 
 ## Enable npm later
 
-1. Verify the scoped package name and account ownership against the npm registry.
+1. Verify availability of the unscoped `agentbridge` package name and account ownership against the npm registry.
 2. Review the passing Actions matrix and install a GitHub release tarball.
 3. Configure npm trusted publishing for this repository and `release.yml` workflow; for first publication, npm may require an initial authenticated publish before a trusted publisher can be attached.
 4. Change npmPublish from false to true in release.config.mjs and use npm provenance. Keep id-token: write and current npm CLI in the workflow. If trusted publishing is unavailable, explicitly configure an automation token secret and pass NPM_TOKEN to the release step; never commit it.

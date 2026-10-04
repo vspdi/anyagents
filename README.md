@@ -1,4 +1,4 @@
-# OmniAgents
+# AgentBridge
 
 Maintain repository instructions, Agent Skills, and MCP definitions once, then expose them through Claude Code and Codex native discovery files.
 
@@ -10,7 +10,7 @@ Maintain repository instructions, Agent Skills, and MCP definitions once, then e
 omniagents.toml
 ```
 
-OmniAgents is a local TypeScript CLI. No telemetry, cloud service, background process, global config mutation, or secret resolution.
+AgentBridge is a local TypeScript CLI. No telemetry, cloud service, background process, global config mutation, or secret resolution.
 
 ## Quick start
 
@@ -22,17 +22,21 @@ pnpm build
 npm pack --ignore-scripts
 ```
 
+Release tarballs use `agentbridge-VERSION.tgz`. For the first stable release, use `agentbridge-0.1.0.tgz`.
+
 In the repository you want to configure:
 
 ```sh
-npx /absolute/path/to/vspdi-omniagents-0.1.0.tgz init
-npx /absolute/path/to/vspdi-omniagents-0.1.0.tgz apply
-npx /absolute/path/to/vspdi-omniagents-0.1.0.tgz check
+npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge init
+npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge apply
+npx --yes --package=/absolute/path/to/agentbridge-VERSION.tgz agentbridge check
 ```
 
-After npm publication, use `npx @vspdi/omniagents <command>`. The executable remains `omniagents`.
+After npm publication, use `npx agentbridge <command>`. The executable is `agentbridge`.
 
 Edit canonical sources only. Run `apply` after changes and `check` in CI. Use `--source .company-ai` or `[source] dir` to choose a different source directory. CLI overrides config; config overrides defaults.
+
+For compatibility with v0.1.0 projects, the configuration filename remains `omniagents.toml` and local ownership state remains in `.omniagents/`.
 
 ## Native destinations
 
@@ -42,7 +46,7 @@ Edit canonical sources only. Run `apply` after changes and `check` in CI. Use `-
 | `.ai/skills/` | `.claude/skills` directory symlink | `.agents/skills` directory symlink |
 | `.ai/mcp.toml` | Generated `.mcp.json` | Managed entries merged into `.codex/config.toml` |
 
-New skills are visible through the directory links immediately. Codex may require project trust before loading project MCP configuration. Claude may prompt for approval of project MCP servers. OmniAgents does not change those client security settings.
+New skills are visible through the directory links immediately. Codex may require project trust before loading project MCP configuration. Claude may prompt for approval of project MCP servers. AgentBridge does not change those client security settings.
 
 ## Commands
 
@@ -66,7 +70,7 @@ Explain topics: `concepts`, `config`, `skills`, `mcp`, `authoring`, `ownership`,
 
 Native symlinks and generated output are committed by default for immediate client discovery after clone. `.omniagents/state.json` is ignored through a marked `.gitignore` block. Copy mode and automatic ignoring of native assets are not supported in v0.1.
 
-OmniAgents refuses unmanaged destination conflicts, including with `apply --force`. Move conflicting files yourself. Force can repair drifted managed generated files/entries; a replaced instruction link that became an ordinary file remains protected. `init --force` explicitly replaces authored scaffold files and should be used deliberately.
+AgentBridge refuses unmanaged destination conflicts, including with `apply --force`. Move conflicting files yourself. Force can repair drifted managed generated files/entries; a replaced instruction link that became an ordinary file remains protected. `init --force` explicitly replaces authored scaffold files and should be used deliberately.
 
 Codex settings and unmanaged MCP server entries are preserved. TOML comments and formatting may change when managed entries change. Unrelated Codex edits do not cause drift. Canonical sources and output parent paths cannot traverse symlinks.
 
@@ -88,7 +92,7 @@ url = "https://example.invalid/mcp"
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }
 ```
 
-MCP commands execute in your coding client and remote servers receive their configured credentials. Review server commands/URLs before use. Prefer environment placeholders to plaintext credentials. OmniAgents never expands placeholders or stores credentials in ownership state or diagnostics.
+MCP commands execute in your coding client and remote servers receive their configured credentials. Review server commands/URLs before use. Prefer environment placeholders to plaintext credentials. AgentBridge never expands placeholders or stores credentials in ownership state or diagnostics.
 
 Codex uses `bearer_token_env_var` for bearer placeholders and `env_http_headers` for whole-header placeholders; static headers use `http_headers`. Same-name STDIO env references become Codex `env_vars`. Codex cannot expand arbitrary embedded placeholders or URL/command/args/cwd placeholders. Unsupported mappings fail before applying. Canonical `cwd` is Codex-only because Claude project MCP has no documented equivalent.
 
