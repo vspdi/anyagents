@@ -31,12 +31,21 @@ try {
       '--prefix',
       temp,
       '--ignore-scripts',
+      '--offline',
       '--no-audit',
       '--no-fund',
       tarball,
     ],
     temp,
   );
+  const installed = JSON.parse(
+    readFileSync(
+      path.join(temp, 'node_modules', 'agentbridge', 'package.json'),
+      'utf8',
+    ),
+  );
+  if (Object.keys(installed.dependencies ?? {}).length)
+    throw new Error('Bundled package must not install production dependencies');
   const cli = path.join(temp, 'node_modules', 'agentbridge', 'dist', 'cli.js');
   run('npm', ['exec', '--offline', '--', 'agentbridge', '--help'], temp);
   run(process.execPath, [cli, '--help'], temp);
