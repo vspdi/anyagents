@@ -20,12 +20,6 @@ This sets dev as default, configures squash and merge methods with PR title defa
 
 The connected integration may have content permissions without the repository Administration permission. If it returns 403, the owner must apply settings in GitHub or run the setup script locally with an admin-authorized gh session. A PR title check verifies input; title-based merge defaults and the ruleset require reviewed PRs and passing checks. GitHub exposes both merge methods; use squash for feature PRs and merge for promotion/sync. GitHub's squash dialog can still be manually edited by a human; contributors must retain the validated Conventional Commit title.
 
-## Enable npm later
+## npm publishing
 
-1. Verify availability of the unscoped `agentbridge` package name and account ownership against the npm registry.
-2. Review the passing Actions matrix and install a GitHub release tarball.
-3. Configure npm trusted publishing for this repository and `release.yml` workflow; for first publication, npm may require an initial authenticated publish before a trusted publisher can be attached.
-4. Change npmPublish from false to true in release.config.mjs and use npm provenance. Keep id-token: write and current npm CLI in the workflow. If trusted publishing is unavailable, explicitly configure an automation token secret and pass NPM_TOKEN to the release step; never commit it.
-5. Merge the publishing change through the normal reviewed branch flow.
-
-No npm credentials are configured by this implementation, and no npm publication has been performed.
+Follow [the secure npm setup guide](npm-publishing.md). semantic-release keeps `npmPublish: false`; the isolated `npm-stage` job uses OIDC to stage tested tarballs for human approval with npm 2FA. Set `NPM_PUBLISH_ENABLED=true` only after configuring the protected `npm-publish` environment and matching npm trusted publisher. No long-lived npm publishing token is used.

@@ -128,3 +128,5 @@ Feature PRs target `dev` and squash. Release promotions merge `dev` into `main`;
 See [decisions](docs/decisions.md), the [original handoff](docs/handoff/00-README.md), and [release setup](docs/releasing.md).
 
 MIT © 2026 Viktor Gerbert.
+
+Secure npm setup and owner actions are documented in [docs/npm-publishing.md](docs/npm-publishing.md).
