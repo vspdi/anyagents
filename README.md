@@ -22,7 +22,7 @@ pnpm build
 npm pack --ignore-scripts
 ```
 
-New releases use `agentbridge-VERSION.tgz`. The existing v0.1.0 release still uses the old package and executable names.
+Release tarballs use `agentbridge-VERSION.tgz`. For the first stable release, use `agentbridge-0.1.0.tgz`.
 
 In the repository you want to configure:
 
