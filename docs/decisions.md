@@ -28,3 +28,7 @@ Repository governance confirmed: one active ruleset targets both dev and main, r
 ## AgentBridge naming
 
 The repository is `vspdi/agentbridge`, the unscoped npm package is `agentbridge`, and the CLI executable is `agentbridge`. npm publishing remains disabled pending secure publishing setup. Existing `omniagents.toml`, `.omniagents/` ownership state, and managed ignore markers remain compatible with the original v0.1.0 release. The archived handoff retains its original product name.
+
+## Publishing security
+
+Builds bundle CLI libraries and the published package has no production dependency installs. The npm publishing job stages the tested tarball with OIDC, separately from project code and dependency installation. npm approval with 2FA is the final public-release gate. Publishing is gated by NPM_PUBLISH_ENABLED and the npm-publish environment; owner account and protection setup must precede enabling it.

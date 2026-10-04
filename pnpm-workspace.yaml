@@ -1,6 +1,6 @@
 packages:
   - .
-allowBuilds:
-  esbuild: set this to true or false
 onlyBuiltDependencies:
   - esbuild
+overrides:
+  esbuild: 0.28.1

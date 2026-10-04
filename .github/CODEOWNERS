@@ -1,0 +1,7 @@
+# Enable required code-owner review only after adding a second trusted reviewer.
+/.github/ @vspdi
+/package.json @vspdi
+/pnpm-lock.yaml @vspdi
+/pnpm-workspace.yaml @vspdi
+/release.config.mjs @vspdi
+/scripts/ @vspdi
