@@ -1,4 +1,4 @@
-# AgentBridge
+# AnyAgents
 
 Maintain repository instructions, Agent Skills, and MCP definitions once, then expose them through Claude Code and Codex native discovery files.
 
@@ -10,7 +10,7 @@ Maintain repository instructions, Agent Skills, and MCP definitions once, then e
 omniagents.toml
 ```
 
-AgentBridge is a local TypeScript CLI. No telemetry, cloud service, background process, global config mutation, or secret resolution.
+AnyAgents is a local TypeScript CLI. No telemetry, cloud service, background process, global config mutation, or secret resolution.
 
 ## Quick start
 
@@ -30,17 +30,17 @@ pnpm build
 npm pack --ignore-scripts
 ```
 
-Release tarballs use `anyagents-VERSION.tgz`. For the first stable release, use `anyagents-0.1.0.tgz`.
+Release tarballs use `anyagents-VERSION.tgz`. The renamed executable starts with version 0.1.1. The historical `anyagents-0.1.0.tgz` uses the executable `agentbridge`; substitute that binary name when installing the old tarball explicitly.
 
 In the repository you want to configure:
 
 ```sh
-npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge init
-npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge apply
-npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz agentbridge check
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz anyagents init
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz anyagents apply
+npx --yes --package=/absolute/path/to/anyagents-VERSION.tgz anyagents check
 ```
 
-Use `npx anyagents <command>`. The executable is `agentbridge`.
+Use `npx anyagents <command>`. The executable is `anyagents`.
 
 Edit canonical sources only. Run `apply` after changes and `check` in CI. Use `--source .company-ai` or `[source] dir` to choose a different source directory. CLI overrides config; config overrides defaults.
 
@@ -54,7 +54,7 @@ For compatibility with v0.1.0 projects, the configuration filename remains `omni
 | `.ai/skills/` | `.claude/skills` directory symlink | `.agents/skills` directory symlink |
 | `.ai/mcp.toml` | Generated `.mcp.json` | Managed entries merged into `.codex/config.toml` |
 
-New skills are visible through the directory links immediately. Codex may require project trust before loading project MCP configuration. Claude may prompt for approval of project MCP servers. AgentBridge does not change those client security settings.
+New skills are visible through the directory links immediately. Codex may require project trust before loading project MCP configuration. Claude may prompt for approval of project MCP servers. AnyAgents does not change those client security settings.
 
 ## Commands
 
@@ -78,7 +78,7 @@ Explain topics: `concepts`, `config`, `skills`, `mcp`, `authoring`, `ownership`,
 
 Native symlinks and generated output are committed by default for immediate client discovery after clone. `.omniagents/state.json` is ignored through a marked `.gitignore` block. Copy mode and automatic ignoring of native assets are not supported in v0.1.
 
-AgentBridge refuses unmanaged destination conflicts, including with `apply --force`. Move conflicting files yourself. Force can repair drifted managed generated files/entries; a replaced instruction link that became an ordinary file remains protected. `init --force` explicitly replaces authored scaffold files and should be used deliberately.
+AnyAgents refuses unmanaged destination conflicts, including with `apply --force`. Move conflicting files yourself. Force can repair drifted managed generated files/entries; a replaced instruction link that became an ordinary file remains protected. `init --force` explicitly replaces authored scaffold files and should be used deliberately.
 
 Codex settings and unmanaged MCP server entries are preserved. TOML comments and formatting may change when managed entries change. Unrelated Codex edits do not cause drift. Canonical sources and output parent paths cannot traverse symlinks.
 
@@ -100,7 +100,7 @@ url = "https://example.invalid/mcp"
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }
 ```
 
-MCP commands execute in your coding client and remote servers receive their configured credentials. Review server commands/URLs before use. Prefer environment placeholders to plaintext credentials. AgentBridge never expands placeholders or stores credentials in ownership state or diagnostics.
+MCP commands execute in your coding client and remote servers receive their configured credentials. Review server commands/URLs before use. Prefer environment placeholders to plaintext credentials. AnyAgents never expands placeholders or stores credentials in ownership state or diagnostics.
 
 Codex uses `bearer_token_env_var` for bearer placeholders and `env_http_headers` for whole-header placeholders; static headers use `http_headers`. Same-name STDIO env references become Codex `env_vars`. Codex cannot expand arbitrary embedded placeholders or URL/command/args/cwd placeholders. Unsupported mappings fail before applying. Canonical `cwd` is Codex-only because Claude project MCP has no documented equivalent.
 
@@ -133,8 +133,7 @@ Biome checks lint/formatting. Vitest covers canonical validation, native transfo
 
 Feature PRs target `dev` and squash. Release promotions merge `dev` into `main`; synchronization merges `main` back into `dev`. Keep Conventional Commit PR titles unchanged in merge dialogs.
 
-See [decisions](docs/decisions.md), the [original handoff](docs/handoff/00-README.md), and [release setup](docs/releasing.md).
+See [release workflow](docs/releasing.md) and [secure npm publishing](docs/npm-publishing.md).
 
 MIT © 2026 Viktor Gerbert.
 
-Secure npm setup and owner actions are documented in [docs/npm-publishing.md](docs/npm-publishing.md).

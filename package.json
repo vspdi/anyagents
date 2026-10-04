@@ -4,7 +4,7 @@
   "description": "Canonical instructions, skills, and MCP configuration for Claude Code and Codex.",
   "type": "module",
   "bin": {
-    "agentbridge": "./dist/cli.js"
+    "anyagents": "./dist/cli.js"
   },
   "files": [
     "dist",

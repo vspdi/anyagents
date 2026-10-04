@@ -105,7 +105,7 @@ jobs:
             const manifest = JSON.parse(readFileSync(0, "utf8"));
             if (manifest.name !== "anyagents" ||
                 manifest.version !== process.env.RELEASE_VERSION ||
-                manifest.bin?.agentbridge !== "./dist/cli.js" ||
+                manifest.bin?.anyagents !== "./dist/cli.js" ||
                 manifest.repository?.url !== "git+https://github.com/vspdi/anyagents.git") {
               throw new Error("Unexpected package identity");
             }

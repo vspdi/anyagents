@@ -72,7 +72,7 @@ export function toml(
   } catch {
     return fail(
       code,
-      'Invalid TOML. Run agentbridge explain config or agentbridge explain mcp.',
+      'Invalid TOML. Run anyagents explain config or anyagents explain mcp.',
       path,
     );
   }
@@ -87,7 +87,7 @@ export function validate<T>(
   if (!result.success)
     fail(
       code,
-      `Invalid canonical input (${result.error.issues.map((i) => i.path.join('.')).join(', ')}). Run agentbridge schema ${code === 'SKILL_INVALID' ? 'skill' : code === 'CANONICAL_MCP_INVALID' ? 'mcp' : 'config'}.`,
+      `Invalid canonical input (${result.error.issues.map((i) => i.path.join('.')).join(', ')}). Run anyagents schema ${code === 'SKILL_INVALID' ? 'skill' : code === 'CANONICAL_MCP_INVALID' ? 'mcp' : 'config'}.`,
       path,
     );
   return result.data;
@@ -103,7 +103,7 @@ export function skill(
   if (!match)
     fail(
       'SKILL_INVALID',
-      'Missing YAML frontmatter. Run agentbridge explain skills.',
+      'Missing YAML frontmatter. Run anyagents explain skills.',
       directory,
     );
   const doc = parseDocument(match[1], { uniqueKeys: true });

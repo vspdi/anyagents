@@ -48,9 +48,7 @@ it('keeps npm publication disabled while enabling stable and dev release channel
 it('semantic-release computes 0.1.0-dev.1 and 0.1.0 from the baseline in a local Git remote', async () => {
   const { default: semanticRelease } = await import('semantic-release');
   const { PassThrough } = await import('node:stream');
-  const directory = mkdtempSync(
-    path.join(tmpdir(), 'omniagents-release-test-'),
-  );
+  const directory = mkdtempSync(path.join(tmpdir(), 'anyagents-release-test-'));
   const remote = path.join(directory, 'remote.git');
   const work = path.join(directory, 'work');
   mkdirSync(work);

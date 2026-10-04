@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
-const temp = mkdtempSync(path.join(tmpdir(), 'omniagents-pack-'));
+const temp = mkdtempSync(path.join(tmpdir(), 'anyagents-pack-'));
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
@@ -47,7 +47,7 @@ try {
   if (Object.keys(installed.dependencies ?? {}).length)
     throw new Error('Bundled package must not install production dependencies');
   const cli = path.join(temp, 'node_modules', 'anyagents', 'dist', 'cli.js');
-  run('npm', ['exec', '--offline', '--', 'agentbridge', '--help'], temp);
+  run('npm', ['exec', '--offline', '--', 'anyagents', '--help'], temp);
   run(process.execPath, [cli, '--help'], temp);
   run(process.execPath, [cli, 'init', '--no-apply'], temp);
   const initialized = spawnSync(process.execPath, [cli, 'apply', '--json'], {
