@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
-          packages=(release-artifacts/agentbridge-*.tgz)
+          packages=(release-artifacts/anyagents-*.tgz)
           if (( ${#packages[@]} == 0 )); then
             echo "No new release; no npm candidate."
             exit 0
@@ -54,7 +54,7 @@ jobs:
           fi
           version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev\.[0-9]+)?$ ]]
-          test "${packages[0]}" = "release-artifacts/agentbridge-$version.tgz"
+          test "${packages[0]}" = "release-artifacts/anyagents-$version.tgz"
           digest=$(sha256sum "${packages[0]}" | cut -d ' ' -f 1)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha256=$digest" >> "$GITHUB_OUTPUT"
@@ -98,12 +98,12 @@ jobs:
           else
             [[ "$RELEASE_VERSION" == *-dev.* ]]
           fi
-          package="./candidate/agentbridge-$RELEASE_VERSION.tgz"
+          package="./candidate/anyagents-$RELEASE_VERSION.tgz"
           printf '%s  %s\n' "$EXPECTED_SHA256" "$package" | sha256sum --check -
           tar -xOf "$package" package/package.json | node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const manifest = JSON.parse(readFileSync(0, "utf8"));
-            if (manifest.name !== "agentbridge" ||
+            if (manifest.name !== "anyagents" ||
                 manifest.version !== process.env.RELEASE_VERSION ||
                 manifest.bin?.agentbridge !== "./dist/cli.js" ||
                 manifest.repository?.url !== "git+https://github.com/vspdi/agentbridge.git") {
