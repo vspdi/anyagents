@@ -1,6 +1,6 @@
 # Secure npm publishing setup
 
-Package: `anyagents`. GitHub repository: `vspdi/agentbridge`. Stable releases come from `main` with npm dist-tag `latest`; prereleases come from `dev` with dist-tag `dev`.
+Package: `anyagents`. GitHub repository: `vspdi/anyagents`. Stable releases come from `main` with npm dist-tag `latest`; prereleases come from `dev` with dist-tag `dev`.
 
 The Release workflow creates GitHub releases independently. When `NPM_PUBLISH_ENABLED` is `true`, a separate job stages the exact same tarball for npm. Only that job has OIDC permission. It has no source checkout, project dependency installation, or package lifecycle execution. All npm candidates require human approval with npm 2FA before becoming public.
 
@@ -47,7 +47,7 @@ Open the `anyagents` package on npm and its **Settings/Trusted Publisher** secti
 | Field | Value |
 | --- | --- |
 | Organization or user | `vspdi` |
-| Repository | `agentbridge` |
+| Repository | `anyagents` |
 | Workflow filename | `release.yml` |
 | Environment name | `npm-publish` |
 | Stage publishing | Allowed |
@@ -99,3 +99,7 @@ References: [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 ## Dependency audit limit
 
 The publishing hardening updates Vitest to 4.1.11 and esbuild to 0.28.1, addressing their reported advisories. The bundled CLI has no install-time production dependencies; libraries are bundled during the build. One high-severity, unpatched `braces` denial-of-service advisory remains in semantic-release's development dependency tree. It concerns deeply nested glob patterns; the current release configuration uses fixed rules. Treat this as an unresolved build-tool risk, monitor its advisory, and review any change that introduces user-controlled release patterns. A clean production-dependency audit does not establish that bundled source or build dependencies are safe.
+
+## Repository renames
+
+The repository is now `vspdi/anyagents`. A repository rename does not rename or unpublish the npm package. Update Git remotes, package repository metadata, release identity checks, and the npm trusted publisher together. Revoke the old repository binding before enabling the replacement. Keep the workflow filename `release.yml`, environment `npm-publish`, and stage-only permissions. GitHub URL redirects do not update npm OIDC trust claims. Published npm versions remain immutable; version 0.1.0 retains its original repository metadata, while future versions use the new URL. The executable remains `agentbridge` for compatibility.
