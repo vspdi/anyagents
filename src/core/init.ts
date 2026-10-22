@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { stringify } from 'smol-toml';
+import { stringify } from 'yaml';
+import { authoringFiles } from '../content/authoring.js';
 import { instructions, templates } from '../content/docs.js';
 import type { Context } from './context.js';
 import { apply } from './engine.js';
@@ -24,8 +25,14 @@ export async function init(ctx: Context, noApply = false) {
   const entries: [string, string][] = [
     [ctx.configPath, stringify(config)],
     [path.join(ctx.source, 'AGENTS.md'), instructions(source)],
-    [path.join(ctx.source, 'mcp.toml'), 'version = 1\n\n[mcp]\n'],
+    [path.join(ctx.source, 'mcp.yaml'), 'version: 1\nmcp: {}\n'],
     [path.join(ctx.source, 'skills/example/SKILL.md'), templates.skill],
+    ...Object.entries(authoringFiles).map(
+      ([name, content]): [string, string] => [
+        path.join(ctx.source, 'skills/anyagents-authoring', name),
+        content,
+      ],
+    ),
   ];
   for (const [p] of entries) {
     await safePath(ctx.root, p);

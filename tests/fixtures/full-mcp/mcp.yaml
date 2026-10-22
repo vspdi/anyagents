@@ -1,0 +1,22 @@
+version: 1
+mcp:
+  z-stdio:
+    transport: stdio
+    command: node
+    args:
+      - server.js
+      - --test
+    env:
+      TOKEN: ${TOKEN}
+      MODE: test
+  a-http:
+    transport: http
+    url: https://example.invalid/mcp
+    headers:
+      Authorization: Bearer ${DOCS_TOKEN}
+      X-Region: eu
+      X-Key: ${KEY}
+  disabled:
+    transport: stdio
+    command: disabled
+    enabled: false
