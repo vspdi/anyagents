@@ -41,12 +41,12 @@ it(
     expect(JSON.parse(run('status', '--json').stdout).targets).toHaveLength(6);
     expect(JSON.parse(run('describe', '--json').stdout).source).toBe('.ai');
     const state = await fs.readFile(
-      path.join(root, '.omniagents/state.json'),
+      path.join(root, '.anyagents/state.json'),
       'utf8',
     );
     expect(run('doctor', '--json').status).toBe(0);
     expect(
-      await fs.readFile(path.join(root, '.omniagents/state.json'), 'utf8'),
+      await fs.readFile(path.join(root, '.anyagents/state.json'), 'utf8'),
     ).toBe(state);
     for (const topic of [
       'concepts',
@@ -66,8 +66,8 @@ it(
     for (const topic of ['config', 'skill', 'mcp-stdio', 'mcp-http'])
       expect(run('template', topic).status).toBe(0);
     await fs.writeFile(
-      path.join(root, '.ai/mcp.toml'),
-      'version=1\n[mcp.docs]\ntransport="http"\nurl="https://example.invalid/mcp"\nheaders={Authorization="Bearer ${DOCS_TOKEN}"}\n',
+      path.join(root, '.ai/mcp.yaml'),
+      'version: 1\nmcp:\n  docs:\n    transport: http\n    url: https://example.invalid/mcp\n    headers:\n      Authorization: Bearer ${DOCS_TOKEN}\n',
     );
     expect(run('check').status).toBe(1);
     expect(run('apply').status).toBe(0);
@@ -107,8 +107,8 @@ it(
     expect(bad.status).toBe(1);
     expect(JSON.parse(bad.stderr).code).toBe('CONFIG_NOT_FOUND');
     await fs.writeFile(
-      path.join(root, 'omniagents.toml'),
-      'version="SUPER_SECRET_SENTINEL"',
+      path.join(root, 'anyagents.yaml'),
+      'version: SUPER_SECRET_SENTINEL\n',
     );
     const invalid = run('apply', '--json');
     expect(invalid.status).toBe(1);
@@ -127,5 +127,47 @@ it(
       'describe',
     ])
       expect(run(command, '--help').status).toBe(0);
+  },
+);
+
+it(
+  'checks fresh checkouts read-only and strict warnings fail CI',
+  { timeout: 30_000 },
+  async () => {
+    const initialized = run('init', '--json');
+    if (
+      initialized.status !== 0 &&
+      initialized.stderr.includes('LINK_UNSUPPORTED')
+    )
+      return;
+    expect(initialized.status, initialized.stderr).toBe(0);
+    await fs.rm(path.join(root, '.anyagents'), { recursive: true });
+    const checked = run('check', '--strict', '--json');
+    expect(checked.status, checked.stderr || checked.stdout).toBe(0);
+    expect(JSON.parse(checked.stdout).current).toBe(true);
+    await expect(fs.stat(path.join(root, '.anyagents'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await fs.appendFile(
+      path.join(root, 'anyagents.yaml'),
+      'unknown_option: true\n',
+    );
+    expect(run('check').status).toBe(0);
+    const strict = run('check', '--strict', '--json');
+    expect(strict.status).toBe(1);
+    expect(JSON.parse(strict.stdout)).toMatchObject({
+      current: false,
+      warnings: ['Unknown config field: unknown_option'],
+    });
+    for (const topic of ['marketplaces', 'plugins', 'ci'])
+      expect(run('explain', topic).status).toBe(0);
+    for (const topic of ['marketplace', 'plugin'])
+      expect(JSON.parse(run('schema', topic).stdout)).toBeTruthy();
+    expect(
+      await fs.readFile(
+        path.join(root, '.ai/skills/anyagents-authoring/references/ci.md'),
+        'utf8',
+      ),
+    ).toContain('check --strict');
   },
 );
