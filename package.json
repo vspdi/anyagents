@@ -35,7 +35,8 @@
     "release": "semantic-release"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.4",
+    "@alchemisten/anyagents-marketplaces": "workspace:*",
+    "@biomejs/biome": "2.5.15",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/github": "^11.0.6",
     "@semantic-release/npm": "^12.0.2",
@@ -45,13 +46,12 @@
     "ajv-formats": "^3.0.1",
     "commander": "^14.0.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "semantic-release": "^24.2.9",
+    "semantic-release": "^25.0.9",
     "smol-toml": "^1.4.2",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "yaml": "^2.8.1",
-    "zod": "^4.1.11",
-    "@alchemisten/anyagents-marketplaces": "workspace:*"
+    "zod": "^4.1.11"
   }
 }
