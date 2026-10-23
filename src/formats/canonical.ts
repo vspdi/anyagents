@@ -1,3 +1,9 @@
+import {
+  identifier,
+  marketplaceReferenceSchema,
+  marketplaceSchema,
+  pluginSchema,
+} from '@alchemisten/anyagents-marketplaces';
 import { parse as parseToml } from 'smol-toml';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
@@ -7,6 +13,8 @@ const text = z.string().min(1).regex(/\S/, 'Expected nonblank text');
 const strings = z.record(z.string(), z.string());
 export const configSchema = z.object({
   version: z.literal(1),
+  project: z.boolean().default(true),
+  marketplaces: z.record(identifier, marketplaceReferenceSchema).default({}),
   source: z.object({ dir: text.default('.ai') }).default({ dir: '.ai' }),
   targets: z
     .object({
@@ -134,7 +142,11 @@ export function unknownConfig(raw: Record<string, unknown>): string[] {
   };
   const warnings: string[] = [];
   for (const key of Object.keys(raw)) {
-    if (!['version', ...Object.keys(allowed)].includes(key))
+    if (
+      !['version', 'project', 'marketplaces', ...Object.keys(allowed)].includes(
+        key,
+      )
+    )
       warnings.push(`Unknown config field: ${key}`);
     if (allowed[key] && raw[key] && typeof raw[key] === 'object')
       for (const sub of Object.keys(raw[key]))
@@ -146,13 +158,15 @@ export function unknownConfig(raw: Record<string, unknown>): string[] {
 export const schemas = Object.fromEntries(
   Object.entries({
     config: configSchema,
+    marketplace: marketplaceSchema,
+    plugin: pluginSchema,
     mcp: mcpSchema,
     skill: skillSchema,
   }).map(([name, schema]) => [
     name,
     {
       ...z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }),
-      $id: `https://omniagents.dev/schema/${name}-v1.json`,
+      $id: `https://github.com/vspdi/anyagents/schema/${name}-v1.json`,
       ...(name === 'skill'
         ? {
             description:
