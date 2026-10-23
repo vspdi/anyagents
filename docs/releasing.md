@@ -33,3 +33,5 @@ The `v0.0.0` license-only baseline lets semantic-release produce the initial `0.
 ## Dependency compatibility
 
 Commander stays on major 14 while the CLI supports Node 20; major 15 requires Node 22.12 or later. The Conventional Commits preset stays on major 9 because major 10 requires conventional-changelog-writer 9, while the current release-notes plugin uses writer 8. Dependabot excludes these incompatible majors. Revisit these exclusions when the runtime baseline or release-notes plugin changes.
+
+Build/test tools also retain Node 20 support: tsup 9 and Vitest 5 require Node 22 and are excluded. Node types stay on major 22 to match the upper CI runtime. Release-only tools execute on Node 24, allowing their newer majors independently.
