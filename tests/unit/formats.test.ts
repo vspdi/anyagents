@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { Ajv2020 as Ajv } from 'ajv/dist/2020.js';
+import { yaml } from '../../src/formats/yaml.js';
 
 const addFormats = createRequire(import.meta.url)('ajv-formats');
 
@@ -12,7 +13,6 @@ import {
   schemas,
   skill,
   skillSchema,
-  toml,
 } from '../../src/formats/canonical.js';
 import {
   claudeServer,
@@ -66,11 +66,11 @@ describe('canonical formats and public documentation', () => {
     const ajv = new Ajv({ strict: false });
     addFormats(ajv);
     for (const [name, schema, good, bad] of [
-      ['config', configSchema, toml(templates.config), { version: 99 }],
+      ['config', configSchema, yaml(templates.config), { version: 99 }],
       [
         'mcp',
         mcpSchema,
-        toml(templates['mcp-http']),
+        yaml(templates['mcp-http']),
         { version: 1, mcp: { bad: { transport: 'http', url: 123 } } },
       ],
       [
@@ -84,7 +84,7 @@ describe('canonical formats and public documentation', () => {
       expect(jsonValidate(good)).toBe(schema.safeParse(good).success);
       expect(jsonValidate(bad)).toBe(schema.safeParse(bad).success);
     }
-    expect(mcpSchema.safeParse(toml(templates['mcp-stdio'])).success).toBe(
+    expect(mcpSchema.safeParse(yaml(templates['mcp-stdio'])).success).toBe(
       true,
     );
   });
@@ -110,7 +110,7 @@ describe('native mappings', () => {
     expect(codexServer(server)).toEqual(claudeServer(server));
   });
   it('translates HTTP token references without resolving environment values', () => {
-    const server = mcpSchema.parse(toml(templates['mcp-http'])).mcp[
+    const server = mcpSchema.parse(yaml(templates['mcp-http'])).mcp[
       'project-docs'
     ];
     expect(codexServer(server)).toEqual({
@@ -189,7 +189,7 @@ it('validates real fixtures and native credential mappings', () => {
       new URL(`../fixtures/${name}/${file}`, import.meta.url),
       'utf8',
     );
-  const full = mcpSchema.parse(toml(fixture('full-mcp', 'mcp.toml')));
+  const full = mcpSchema.parse(yaml(fixture('full-mcp', 'mcp.yaml')));
   expect(Object.keys(nativeServers(full, 'codex'))).toEqual([
     'a-http',
     'z-stdio',
@@ -201,10 +201,10 @@ it('validates real fixtures and native credential mappings', () => {
     env_http_headers: { 'X-Key': 'KEY' },
   });
   expect(() =>
-    mcpSchema.parse(toml(fixture('invalid-mcp', 'mcp.toml'))),
+    mcpSchema.parse(yaml(fixture('invalid-mcp', 'mcp.yaml'))),
   ).toThrow();
   expect(() =>
     skill(fixture('invalid-skill', 'SKILL.md'), 'invalid-skill', []),
   ).toThrow();
-  expect(mcpSchema.parse(toml(fixture('minimal', 'mcp.toml'))).mcp).toEqual({});
+  expect(mcpSchema.parse(yaml(fixture('minimal', 'mcp.yaml'))).mcp).toEqual({});
 });
