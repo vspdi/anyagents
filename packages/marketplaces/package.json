@@ -1,0 +1,6 @@
+{
+  "name": "@alchemisten/anyagents-marketplaces",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}

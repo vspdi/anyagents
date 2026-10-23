@@ -55,7 +55,10 @@ export function stable(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value) ?? 'null';
 }
-export async function atomicWrite(p: string, content: string): Promise<void> {
+export async function atomicWrite(
+  p: string,
+  content: string | Buffer,
+): Promise<void> {
   const temp = `${p}.${randomUUID()}.tmp`;
   try {
     await fs.mkdir(path.dirname(p), { recursive: true });
@@ -118,3 +121,15 @@ export async function sourceHash(
   }
   return `sha256:${h.digest('hex')}`;
 }
+
+export const artifactHash = (content: Buffer): string => {
+  const text = content.toString('utf8');
+  return hash(
+    !content.includes(0) && Buffer.from(text).equals(content)
+      ? text.replace(/\r\n/g, '\n')
+      : content,
+  );
+};
+
+export const pathIdentity = (value: string): string =>
+  process.platform === 'win32' ? value.toLowerCase() : value;

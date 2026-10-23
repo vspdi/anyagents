@@ -2,11 +2,12 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { MarketplaceError } from '@alchemisten/anyagents-marketplaces';
 import { Command, CommanderError } from 'commander';
 import { explanations, templates, version } from './content/docs.js';
 import { context, type Options } from './core/context.js';
 import { apply, plan } from './core/engine.js';
-import { fail, OmniError } from './core/errors.js';
+import { AnyAgentsError, fail } from './core/errors.js';
 import { exists, safePath } from './core/filesystem.js';
 import { init } from './core/init.js';
 import { schemas } from './formats/canonical.js';
@@ -29,7 +30,7 @@ const program = new Command()
   .option('--no-color', 'disable ANSI colors');
 program.addHelpText(
   'after',
-  '\nAuthoring documentation:\n  anyagents explain <authoring|skills|mcp|config|ownership>\n  anyagents schema <config|mcp|skill|all>\n  anyagents template <skill|mcp-stdio|mcp-http|config>',
+  '\nAuthoring documentation:\n  anyagents explain <authoring|skills|mcp|config|ownership|plugins|marketplaces|ci>\n  anyagents schema <config|mcp|skill|marketplace|plugin|all>\n  anyagents template <skill|mcp-stdio|mcp-http|config|marketplace|plugin|authoring-skill>',
 );
 program.exitOverride();
 program.configureOutput({ outputError: () => {} });
@@ -65,20 +66,24 @@ program
   });
 program
   .command('check')
-  .description('Read-only strict validation for CI.')
+  .description('Read-only validation and output comparison for CI.')
+  .option('--strict', 'fail on warnings as well as errors')
   .action(async (_opts, command: Command) => {
     const opts = options(command);
     const ctx = await context(opts);
     const desired = await plan(ctx, true);
     output(
       {
-        current: desired.issues.length === 0,
+        current:
+          desired.issues.length === 0 &&
+          (!opts.strict || ctx.warnings.length === 0),
         issues: desired.issues,
         warnings: ctx.warnings,
       },
       opts,
     );
-    if (desired.issues.length) process.exitCode = 1;
+    if (desired.issues.length || (opts.strict && ctx.warnings.length))
+      process.exitCode = 1;
   });
 program
   .command('status')
@@ -92,7 +97,7 @@ program
       path: string;
       state: string;
     }[] = [];
-    for (const target of ctx.targets)
+    for (const target of ctx.config.project ? ctx.targets : [])
       for (const asset of ['instructions', 'skills', 'mcp']) {
         const name =
           target === 'claude'
@@ -123,6 +128,29 @@ program
         }
         rows.push({ target, asset, path: name, state });
       }
+    for (const [name, marketplace] of Object.entries(ctx.config.marketplaces)) {
+      const root = path.resolve(
+        path.dirname(ctx.configPath),
+        marketplace.output,
+      );
+      for (const target of ctx.targets) {
+        const filename = path.join(
+          root,
+          target === 'claude'
+            ? '.claude-plugin/marketplace.json'
+            : '.agents/plugins/marketplace.json',
+        );
+        await safePath(ctx.root, filename);
+        rows.push({
+          target,
+          asset: `marketplace:${name}`,
+          path: path.relative(ctx.root, filename),
+          state: (await exists(filename))
+            ? 'present (run check to verify)'
+            : 'missing',
+        });
+      }
+    }
     output(
       {
         source: path.relative(ctx.root, ctx.source),
@@ -152,7 +180,7 @@ program
       diagnostics.issues = desired.issues;
     } catch (e) {
       diagnostics.error =
-        e instanceof OmniError
+        e instanceof AnyAgentsError
           ? { code: e.code, message: e.message, path: e.path }
           : { code: 'APPLY_FAILED', message: 'Cannot inspect project.' };
     }
@@ -170,7 +198,7 @@ program
       '.agents/skills',
       '.mcp.json',
       '.codex/config.toml',
-      '.omniagents/state.json',
+      '.anyagents/state.json',
     ]) {
       let parent = path.dirname(path.join(ctx.root, relative));
       await safePath(ctx.root, parent);
@@ -185,7 +213,7 @@ program
     diagnostics.writableParents = writableParents;
     diagnostics.linkCapability = 'not probed; run doctor --probe';
     if (opts.probe) {
-      const dir = path.join(ctx.root, `.omniagents-probe-${randomUUID()}`);
+      const dir = path.join(ctx.root, `.anyagents-probe-${randomUUID()}`);
       try {
         await fs.mkdir(dir);
         await fs.writeFile(path.join(dir, 'source'), 'probe');
@@ -230,7 +258,10 @@ program
   .action((topic: string) => {
     const data = topic === 'all' ? schemas : schemas[topic];
     if (!data)
-      fail('USAGE_ERROR', 'Schema topic must be config, mcp, skill, or all.');
+      fail(
+        'USAGE_ERROR',
+        'Schema topic must be config, mcp, skill, marketplace, plugin, or all.',
+      );
     process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
   });
 program
@@ -255,7 +286,8 @@ program
         version,
         source: path.relative(ctx.root, ctx.source),
         targets: ctx.targets,
-        canonicalPaths: ['AGENTS.md', 'skills', 'mcp.toml'].map((p) =>
+        marketplaces: ctx.config.marketplaces,
+        canonicalPaths: ['AGENTS.md', 'skills', 'mcp.yaml'].map((p) =>
           path.relative(ctx.root, path.join(ctx.source, p)),
         ),
         configPath: path.relative(ctx.root, ctx.configPath),
@@ -278,11 +310,11 @@ try {
 } catch (e) {
   if (!(e instanceof CommanderError && e.exitCode === 0)) {
     const error =
-      e instanceof OmniError
+      e instanceof AnyAgentsError || e instanceof MarketplaceError
         ? e
         : e instanceof CommanderError
-          ? new OmniError('USAGE_ERROR', e.message)
-          : new OmniError(
+          ? new AnyAgentsError('USAGE_ERROR', e.message)
+          : new AnyAgentsError(
               'APPLY_FAILED',
               'Operation failed. Run anyagents doctor and check filesystem permissions.',
             );

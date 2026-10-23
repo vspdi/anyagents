@@ -8,7 +8,18 @@ import { version } from '../content/docs.js';
 import { toml, validate } from '../formats/canonical.js';
 import type { Context, Target } from './context.js';
 import { fail } from './errors.js';
-import { atomicWrite, exists, hash, safePath, stable } from './filesystem.js';
+import {
+  artifactHash,
+  atomicWrite,
+  exists,
+  files,
+  hash,
+  pathIdentity,
+  safePath,
+  sourceHash,
+  stable,
+} from './filesystem.js';
+import { marketplaceInputs } from './marketplaces.js';
 import { inputs } from './project.js';
 
 const record = z.record(z.string(), z.string());
@@ -20,6 +31,10 @@ const stateSchema = z
     schemaVersion: z.literal(1),
     toolVersion: z.string(),
     sourceHash: z.string(),
+    marketplaces: z
+      .object({ claude: record.optional(), codex: record.optional() })
+      .strict()
+      .default({}),
     managed: z
       .object({ claude: targetState.optional(), codex: targetState.optional() })
       .strict(),
@@ -28,10 +43,11 @@ const stateSchema = z
 type State = z.infer<typeof stateSchema>;
 type Managed = z.infer<typeof targetState>;
 export interface Operation {
-  kind: 'symlink' | 'generate';
+  kind: 'symlink' | 'generate' | 'remove';
   destination: string;
   source?: string;
-  content?: string;
+  content?: string | Buffer;
+  mode?: number;
 }
 interface Plan {
   operations: Operation[];
@@ -42,7 +58,7 @@ function issue(plan: Plan, code: string, message: string, p: string) {
   plan.issues.push({ code, message, path: p });
 }
 async function loadState(ctx: Context): Promise<State> {
-  const p = path.join(ctx.root, '.omniagents/state.json');
+  const p = path.join(ctx.root, '.anyagents/state.json');
   await safePath(ctx.root, p);
   if (!(await exists(p)))
     return {
@@ -50,6 +66,7 @@ async function loadState(ctx: Context): Promise<State> {
       toolVersion: version,
       sourceHash: '',
       managed: {},
+      marketplaces: {},
     };
   let raw: unknown;
   try {
@@ -65,12 +82,23 @@ async function loadState(ctx: Context): Promise<State> {
 }
 export async function plan(ctx: Context, checking = false): Promise<Plan> {
   const input = await inputs(ctx);
+  const marketplaces = await marketplaceInputs(ctx);
   const old = await loadState(ctx);
+  const marketplaceHash = await sourceHash(
+    ctx.root,
+    [
+      ...marketplaces.sources,
+      ...((await exists(ctx.configPath)) ? [ctx.configPath] : []),
+    ],
+    version,
+  );
+  input.sourceHash = hash(`${input.sourceHash}:${marketplaceHash}`);
   const next: State = {
     ...old,
     toolVersion: version,
     sourceHash: input.sourceHash,
     managed: { ...old.managed },
+    marketplaces: { ...old.marketplaces },
   };
   const plan: Plan = { operations: [], state: next, issues: [] };
   for (const target of Object.keys(old.managed))
@@ -79,6 +107,7 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
         `Target ${target} is unselected; existing outputs remain untouched.`,
       );
   for (const target of ctx.targets) {
+    if (!ctx.config.project) continue;
     const managed: Managed = { links: {}, generated: {}, servers: {} };
     const previous = old.managed[target];
     const adapter = adapters[target];
@@ -144,7 +173,9 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
       next.managed[target] = managed;
       continue;
     }
-    const current = stat ? await fs.readFile(full, 'utf8') : null;
+    const current = stat
+      ? (await fs.readFile(full, 'utf8')).replace(/\r\n/g, '\n')
+      : null;
     let output: string;
     if (target === 'claude') {
       output = `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`;
@@ -221,12 +252,12 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
           'MCP output differs. Run anyagents apply.',
           dest,
         );
-      if (!previous || stable(previous) !== stable(managed))
+      if (previous && stable(previous) !== stable(managed))
         issue(
           plan,
           'OUTPUT_DRIFT',
           'Ownership state differs. Run anyagents apply.',
-          '.omniagents/state.json',
+          '.anyagents/state.json',
         );
     } else if (current !== output)
       plan.operations.push({
@@ -236,12 +267,140 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
       });
     next.managed[target] = managed;
   }
-  if (checking && old.sourceHash !== input.sourceHash)
+  const allDestinations = new Set<string>();
+  for (const target of ctx.targets) {
+    const prior = Object.fromEntries(
+      Object.entries(old.marketplaces[target] ?? {}).map(([dest, digest]) => [
+        pathIdentity(dest),
+        digest,
+      ]),
+    );
+    const desired = marketplaces.artifacts[target];
+    const hashes: Record<string, string> = {};
+    for (const artifact of desired) {
+      const dest = artifact.destination;
+      const key = pathIdentity(dest);
+      if (
+        allDestinations.has(key) ||
+        plan.operations.some((op) => pathIdentity(op.destination) === key)
+      )
+        fail('DESTINATION_CONFLICT', 'Generated destinations collide.', dest);
+      allDestinations.add(key);
+      const full = path.join(ctx.root, dest);
+      await safePath(ctx.root, full);
+      const stat = await exists(full);
+      if (stat && !stat.isFile())
+        fail(
+          'DESTINATION_CONFLICT',
+          'Generated artifact must be an ordinary file.',
+          dest,
+        );
+      const actual = stat ? artifactHash(await fs.readFile(full)) : null;
+      const expected = artifactHash(artifact.content);
+      hashes[dest] = expected;
+      const modeDiffers =
+        process.platform !== 'win32' &&
+        stat &&
+        artifact.mode !== undefined &&
+        (stat.mode & 0o111) !== (artifact.mode & 0o111);
+      if (actual === expected && !modeDiffers) continue;
+      if (checking)
+        issue(
+          plan,
+          'OUTPUT_DRIFT',
+          'Marketplace artifact differs; run anyagents apply.',
+          dest,
+        );
+      else if (
+        actual !== null &&
+        actual !== expected &&
+        (!prior[key] || (prior[key] !== actual && !ctx.force))
+      )
+        issue(
+          plan,
+          prior[key] ? 'OUTPUT_DRIFT' : 'DESTINATION_CONFLICT',
+          'Artifact is unmanaged or edited; restore it before applying.',
+          dest,
+        );
+      else plan.operations.push({ kind: 'generate', ...artifact });
+    }
+    for (const dest of Object.keys(prior)) {
+      if (Object.keys(hashes).some((desired) => pathIdentity(desired) === dest))
+        continue;
+      const full = path.join(ctx.root, dest);
+      await safePath(ctx.root, full);
+      if (
+        marketplaces.sources.some(
+          (source) => pathIdentity(source) === pathIdentity(full),
+        ) ||
+        pathIdentity(full) === pathIdentity(ctx.configPath) ||
+        pathIdentity(full).startsWith(`${pathIdentity(ctx.source)}${path.sep}`)
+      )
+        fail(
+          'DESTINATION_CONFLICT',
+          'Prior output overlaps canonical input.',
+          dest,
+        );
+      const stat = await exists(full);
+      if (!stat) continue;
+      if (
+        !stat.isFile() ||
+        artifactHash(await fs.readFile(full)) !== prior[dest]
+      )
+        issue(
+          plan,
+          'DESTINATION_CONFLICT',
+          'Obsolete artifact was edited; move it before applying.',
+          dest,
+        );
+      else if (checking)
+        issue(
+          plan,
+          'OUTPUT_DRIFT',
+          'Obsolete managed artifact remains; run anyagents apply.',
+          dest,
+        );
+      else plan.operations.push({ kind: 'remove', destination: dest });
+    }
+    next.marketplaces[target] = hashes;
+  }
+  for (const root of marketplaces.roots) {
+    await safePath(ctx.root, root);
+    if (!(await exists(root))) continue;
+    if (!(await exists(root))?.isDirectory())
+      fail(
+        'DESTINATION_CONFLICT',
+        'Plugin bundle root must be a directory.',
+        root,
+      );
+    for (const file of await files(root)) {
+      const dest = path.relative(ctx.root, file).split(path.sep).join('/');
+      if (
+        !ctx.targets.some((target) =>
+          Object.keys(next.marketplaces[target] ?? {}).some(
+            (desired) => pathIdentity(desired) === pathIdentity(dest),
+          ),
+        ) &&
+        !plan.operations.some(
+          (op) =>
+            op.kind === 'remove' &&
+            pathIdentity(op.destination) === pathIdentity(dest),
+        )
+      )
+        issue(
+          plan,
+          'DESTINATION_CONFLICT',
+          'Unexpected file in generated plugin bundles; move it or restore canonical sources.',
+          dest,
+        );
+    }
+  }
+  if (checking && old.sourceHash && old.sourceHash !== input.sourceHash)
     issue(
       plan,
       'OUTPUT_DRIFT',
       'Canonical source changed. Run anyagents apply.',
-      '.omniagents/state.json',
+      '.anyagents/state.json',
     );
   if (!checking) {
     const ignore = path.join(ctx.root, '.gitignore');
@@ -250,11 +409,10 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
       ? await fs.readFile(ignore, 'utf8')
       : '';
     const block =
-      '# BEGIN OmniAgents managed outputs\n.omniagents/\n# END OmniAgents managed outputs';
+      '# BEGIN AnyAgents managed outputs\n.anyagents/\n# END AnyAgents managed outputs';
     const starts =
-      current.match(/# BEGIN OmniAgents managed outputs/g)?.length ?? 0;
-    const ends =
-      current.match(/# END OmniAgents managed outputs/g)?.length ?? 0;
+      current.match(/# BEGIN AnyAgents managed outputs/g)?.length ?? 0;
+    const ends = current.match(/# END AnyAgents managed outputs/g)?.length ?? 0;
     if (starts !== ends || starts > 1)
       fail(
         'DESTINATION_CONFLICT',
@@ -263,7 +421,7 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
       );
     const output = starts
       ? current.replace(
-          /# BEGIN OmniAgents managed outputs[\s\S]*?# END OmniAgents managed outputs/,
+          /# BEGIN AnyAgents managed outputs[\s\S]*?# END AnyAgents managed outputs/,
           block,
         )
       : `${current}${current && !current.endsWith('\n') ? '\n' : ''}${block}\n`;
@@ -311,7 +469,7 @@ export async function apply(
       initial.issues[0].path,
     );
   ctx.warnings = [...new Set(ctx.warnings)];
-  const stateDir = path.join(ctx.root, '.omniagents');
+  const stateDir = path.join(ctx.root, '.anyagents');
   await safePath(ctx.root, stateDir);
   const newStateDir = !(await exists(stateDir));
   let succeeded = false;
@@ -324,7 +482,7 @@ export async function apply(
     if ((e as NodeJS.ErrnoException).code === 'EEXIST')
       fail(
         'APPLY_FAILED',
-        'Another apply is running, or a stale .omniagents/apply.lock must be removed.',
+        'Another apply is running, or a stale .anyagents/apply.lock must be removed.',
       );
     throw e;
   }
@@ -338,7 +496,7 @@ export async function apply(
         desired.issues[0].message,
         desired.issues[0].path,
       );
-    const stateContent = `${JSON.stringify(desired.state, null, 2)}\n`;
+    const stateContent = `${JSON.stringify(stateSchema.parse(desired.state), null, 2)}\n`;
     const statePath = path.join(stateDir, 'state.json');
     const stateCurrent = (await exists(statePath))
       ? await fs.readFile(statePath, 'utf8')
@@ -349,7 +507,7 @@ export async function apply(
         ? [
             {
               kind: 'generate' as const,
-              destination: '.omniagents/state.json',
+              destination: '.anyagents/state.json',
               content: stateContent,
             },
           ]
@@ -377,7 +535,11 @@ export async function apply(
         await fs.mkdir(p);
         created.push(p);
       }
-      if (op.kind === 'generate') await atomicWrite(full, op.content ?? '');
+      if (op.kind === 'generate') {
+        await atomicWrite(full, op.content ?? '');
+        if (op.mode !== undefined && process.platform !== 'win32')
+          await fs.chmod(full, op.mode);
+      } else if (op.kind === 'remove') await fs.unlink(full);
       else {
         const temp = `${full}.${randomUUID()}.tmp`;
         try {
