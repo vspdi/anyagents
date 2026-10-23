@@ -32,7 +32,7 @@ it('requires conventional titles, including scopes and breaking changes', () => 
     validFlow('main', 'feature/test', 'vspdi/anyagents', 'vspdi/anyagents'),
   ).toBe(false);
   expect(
-    validFlow('main', 'dev', 'attacker/omniagents', 'vspdi/anyagents'),
+    validFlow('main', 'dev', 'attacker/anyagents', 'vspdi/anyagents'),
   ).toBe(false);
 });
 it('keeps npm publication disabled while enabling stable and dev release channels', () => {
