@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -9,7 +15,7 @@ function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: process.platform === 'win32' && command === 'npm',
   });
   if (result.status !== 0)
     throw new Error(`${command} failed: ${result.stderr || result.stdout}`);
@@ -73,6 +79,51 @@ try {
       'Packed CLI install, init, apply, check, and idempotence passed.',
     );
   }
+  const marketplace = path.join(temp, 'marketplace-smoke');
+  mkdirSync(path.join(marketplace, '.ai', 'plugins', 'review'), {
+    recursive: true,
+  });
+  writeFileSync(
+    path.join(marketplace, 'anyagents.yaml'),
+    'version: 1\nproject: false\nmarketplaces:\n  sample:\n    source: .ai/marketplace.yaml\n    output: .\n',
+  );
+  writeFileSync(
+    path.join(marketplace, '.ai', 'marketplace.yaml'),
+    run(process.execPath, [cli, 'template', 'marketplace'], temp),
+  );
+  writeFileSync(
+    path.join(marketplace, '.ai', 'plugins', 'review', 'plugin.yaml'),
+    run(process.execPath, [cli, 'template', 'plugin'], temp),
+  );
+  run(process.execPath, [cli, 'apply'], marketplace);
+  rmSync(path.join(marketplace, '.anyagents'), { recursive: true });
+  run(process.execPath, [cli, 'check', '--strict'], marketplace);
+  const manifest = JSON.parse(
+    readFileSync(
+      path.join(marketplace, 'plugins', 'codex', 'review', 'plugin.json'),
+      'utf8',
+    ),
+  );
+  if (manifest.name !== 'review')
+    throw new Error('Packed CLI generated an invalid plugin identity');
+  run(process.execPath, [cli, 'explain', 'ci'], temp);
+  if (
+    !readFileSync(
+      path.join(
+        temp,
+        '.ai',
+        'skills',
+        'anyagents-authoring',
+        'references',
+        'ci.md',
+      ),
+      'utf8',
+    ).includes('check --strict')
+  )
+    throw new Error('Missing bundled CI recipe');
+  console.log(
+    'Packed CLI marketplace generation, fresh-checkout strict validation, and authoring skill passed.',
+  );
   if (
     !readFileSync(path.join(temp, '.ai', 'AGENTS.md'), 'utf8').includes(
       'authoring',

@@ -9,7 +9,10 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "skills",
+    "docs/validation.md",
+    "third-party-licenses"
   ],
   "engines": {
     "node": ">=20"
@@ -48,6 +51,7 @@
     "typescript": "^5.9.2",
     "vitest": "^4.1.11",
     "yaml": "^2.8.1",
-    "zod": "^4.1.11"
+    "zod": "^4.1.11",
+    "@alchemisten/anyagents-marketplaces": "workspace:*"
   }
 }
