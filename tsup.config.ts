@@ -7,6 +7,7 @@ export default defineConfig({
   bundle: true,
   splitting: false,
   clean: true,
+  loader: { '.md': 'text' },
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
   },
