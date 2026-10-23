@@ -36,10 +36,10 @@
   },
   "devDependencies": {
     "@alchemisten/anyagents-marketplaces": "workspace:*",
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.2",
     "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/github": "^11.0.6",
-    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/github": "^12.0.10",
+    "@semantic-release/npm": "^13.2.0",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "^22.18.6",
     "ajv": "^8.17.1",
@@ -47,11 +47,11 @@
     "commander": "^14.0.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "semantic-release": "^25.0.9",
-    "smol-toml": "^1.4.2",
+    "smol-toml": "^1.9.1",
     "tsup": "^8.5.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "yaml": "^2.8.1",
-    "zod": "^4.1.11"
+    "zod": "^4.6.7"
   }
 }
