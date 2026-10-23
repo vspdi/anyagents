@@ -25,8 +25,9 @@ npx anyagents check
 .ai/
 ├── AGENTS.md
 ├── skills/example/SKILL.md
-└── mcp.toml
-omniagents.toml
+├── skills/anyagents-authoring/SKILL.md
+└── mcp.yaml
+anyagents.yaml
 ```
 
 Add your project's instructions to `.ai/AGENTS.md`. For example, in a pnpm project:
@@ -45,11 +46,11 @@ npx anyagents apply
 npx anyagents check
 ```
 
-Edit `.ai/AGENTS.md` for instructions, `.ai/skills/` for skills, and `.ai/mcp.toml` for MCP servers. Review and commit the shared sources, project configuration, and native files using your normal Git workflow. AnyAgents does not create Git commits; local ownership state is ignored.
+Edit `.ai/AGENTS.md` for instructions, `.ai/skills/` for skills, and `.ai/mcp.yaml` for MCP servers. Review and commit the shared sources, project configuration, and native files using your normal Git workflow. AnyAgents does not create Git commits; local ownership state is ignored.
 
 If your repository already has instructions, skills, or MCP configuration, AnyAgents refuses conflicting unmanaged files. See [ownership and conflicts](docs/reference.md#ownership-and-git-behavior) before initializing an existing setup. `--force` does not bypass unmanaged-output protection.
 
-The configuration filename `omniagents.toml` is retained for compatibility. See [installation alternatives](docs/installing.md) for tarballs and source builds.
+See [installation alternatives](docs/installing.md) for tarballs and source builds.
 
 ## What each client receives
 
@@ -57,7 +58,7 @@ The configuration filename `omniagents.toml` is retained for compatibility. See 
 | --- | --- | --- |
 | `.ai/AGENTS.md` | `CLAUDE.md` symlink | `AGENTS.md` symlink |
 | `.ai/skills/` | `.claude/skills` directory symlink | `.agents/skills` directory symlink |
-| `.ai/mcp.toml` | Generated `.mcp.json` | Managed entries in `.codex/config.toml` |
+| `.ai/mcp.yaml` | Generated `.mcp.json` | Managed entries in `.codex/config.toml` |
 
 Edit the shared sources rather than the linked or generated destinations. New skills appear through the directory links immediately. Your coding client may require project trust or MCP approval before using the configuration.
 
@@ -82,7 +83,20 @@ npx anyagents explain skills
 npx anyagents explain mcp
 ```
 
-See the [CLI and project reference](docs/reference.md) for schemas, templates, target selection, JSON output, ownership rules, and MCP examples. Use `check` in CI to catch invalid configuration or drift.
+See the [CLI and project reference](docs/reference.md) for schemas, templates, target selection, JSON output, ownership rules, and MCP examples. Use `check --strict` in CI to catch invalid configuration or drift.
+
+## Plugins, marketplaces, and CI
+
+Configure one or more `marketplaces` entries in `anyagents.yaml`, each with a canonical YAML `source` and native `output` root. Set `project: false` for marketplace-only repositories. Each catalog references plugin directories with `plugin.yaml`, optional plugin-scoped `mcp.yaml`, and skills/assets. Local project MCP stays separate.
+
+```sh
+npx anyagents explain marketplaces
+npx anyagents explain plugins
+npx anyagents explain ci
+npx anyagents check --strict
+```
+
+`init` installs the bundled authoring skill with definition and CI recipes. See [canonical definitions](skills/anyagents-authoring/references/definitions.md), [GitHub Actions and GitLab CI](skills/anyagents-authoring/references/ci.md), and [migration](docs/migration.md). Checks work on fresh checkouts without local ownership state; CI never needs to apply first.
 
 ## Safety and scope
 

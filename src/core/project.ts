@@ -1,20 +1,17 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { version } from '../content/docs.js';
-import {
-  type Mcp,
-  mcpSchema,
-  skill,
-  toml,
-  validate,
-} from '../formats/canonical.js';
+import { type Mcp, mcpSchema, skill, validate } from '../formats/canonical.js';
+import { yaml } from '../formats/yaml.js';
 import type { Context } from './context.js';
 import { fail } from './errors.js';
 import { exists, files, safePath, sourceHash } from './filesystem.js';
 export async function inputs(
   ctx: Context,
 ): Promise<{ mcp: Mcp; sourceHash: string }> {
-  for (const asset of ['AGENTS.md', 'mcp.toml', 'skills']) {
+  if (!ctx.config.project)
+    return { mcp: mcpSchema.parse({ version: 1 }), sourceHash: '' };
+  for (const asset of ['AGENTS.md', 'mcp.yaml', 'skills']) {
     const p = path.join(ctx.source, asset);
     await safePath(ctx.root, p);
     const stat = await exists(p);
@@ -33,8 +30,8 @@ export async function inputs(
   }
   const mcp = validate(
     mcpSchema,
-    toml(
-      await fs.readFile(path.join(ctx.source, 'mcp.toml'), 'utf8'),
+    yaml(
+      await fs.readFile(path.join(ctx.source, 'mcp.yaml'), 'utf8'),
       'CANONICAL_MCP_INVALID',
     ),
     'CANONICAL_MCP_INVALID',
@@ -67,7 +64,7 @@ export async function inputs(
     }
   const canonical = [
     path.join(ctx.source, 'AGENTS.md'),
-    path.join(ctx.source, 'mcp.toml'),
+    path.join(ctx.source, 'mcp.yaml'),
     ...(await files(path.join(ctx.source, 'skills'))),
   ];
   if (await exists(ctx.configPath)) canonical.push(ctx.configPath);
