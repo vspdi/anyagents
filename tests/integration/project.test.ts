@@ -48,10 +48,10 @@ async function ready() {
 it('initializes, links canonical assets, and makes second apply a true no-op', async () => {
   if (!(await ready())) return;
   expect((await plan(await ctx(), true)).issues).toEqual([]);
-  const state = await fs.stat(path.join(root, '.omniagents/state.json'));
+  const state = await fs.stat(path.join(root, '.anyagents/state.json'));
   expect((await apply(await ctx())).operations).toEqual([]);
   expect(
-    (await fs.stat(path.join(root, '.omniagents/state.json'))).mtimeMs,
+    (await fs.stat(path.join(root, '.anyagents/state.json'))).mtimeMs,
   ).toEqual(state.mtimeMs);
   expect(await fs.realpath(path.join(root, 'CLAUDE.md'))).toBe(
     path.join(root, '.ai/AGENTS.md'),
@@ -71,15 +71,15 @@ it('initializes, links canonical assets, and makes second apply a true no-op', a
 it('resolves config-relative source, CLI precedence, and unknown field warnings', async () => {
   await fs.mkdir(path.join(root, 'settings'));
   await fs.writeFile(
-    path.join(root, 'settings/config.toml'),
-    'version=1\nunknown=true\n[source]\ndir="../canonical"\n[targets]\nclaude=false\ncodex=true\n',
+    path.join(root, 'settings/config.yaml'),
+    'version: 1\nunknown: true\nsource:\n  dir: ../canonical\ntargets:\n  claude: false\n  codex: true\n',
   );
-  const resolved = await ctx({ config: 'settings/config.toml' });
+  const resolved = await ctx({ config: 'settings/config.yaml' });
   expect(resolved.source).toBe(path.join(root, 'canonical'));
   expect(resolved.targets).toEqual(['codex']);
   expect(resolved.warnings).toHaveLength(1);
   const override = await ctx({
-    config: 'settings/config.toml',
+    config: 'settings/config.yaml',
     source: 'override',
     target: ['claude'],
   });
@@ -125,8 +125,8 @@ it('preserves unrelated Codex config and removes only previously managed servers
     'model="user-model"\n[mcp_servers.user]\ncommand="user-server"\n',
   );
   await fs.writeFile(
-    path.join(root, '.ai/mcp.toml'),
-    'version=1\n[mcp.managed]\ntransport="stdio"\ncommand="node"\n',
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  managed:\n    transport: stdio\n    command: node\n',
   );
   if (!linkSupported) {
     await expect(apply(await ctx())).rejects.toMatchObject({
@@ -148,7 +148,7 @@ it('preserves unrelated Codex config and removes only previously managed servers
     '\n[unrelated]\nsetting=true\n',
   );
   expect((await plan(await ctx(), true)).issues).toEqual([]);
-  await fs.writeFile(path.join(root, '.ai/mcp.toml'), 'version=1\n[mcp]\n');
+  await fs.writeFile(path.join(root, '.ai/mcp.yaml'), 'version: 1\nmcp: {}\n');
   await apply(await ctx());
   output = parse(
     await fs.readFile(path.join(root, '.codex/config.toml'), 'utf8'),
@@ -159,8 +159,8 @@ it('preserves unrelated Codex config and removes only previously managed servers
 it('refuses collisions with unmanaged Codex entries but accepts identical cloned outputs', async () => {
   if (!(await ready())) return;
   await fs.writeFile(
-    path.join(root, '.ai/mcp.toml'),
-    'version=1\n[mcp.user]\ntransport="stdio"\ncommand="canonical"\n',
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  user:\n    transport: stdio\n    command: canonical\n',
   );
   await fs.writeFile(
     path.join(root, '.codex/config.toml'),
@@ -171,7 +171,7 @@ it('refuses collisions with unmanaged Codex entries but accepts identical cloned
   });
   await fs.writeFile(path.join(root, '.codex/config.toml'), '');
   await apply(await ctx());
-  await fs.rm(path.join(root, '.omniagents'), { recursive: true });
+  await fs.rm(path.join(root, '.anyagents'), { recursive: true });
   await apply(await ctx());
   expect((await plan(await ctx(), true)).issues).toEqual([]);
 });
@@ -181,7 +181,7 @@ it('dry-run and check are read-only', async () => {
   await apply(await ctx(), true);
   await plan(await ctx(), true);
   expect(await files(root)).toEqual(before);
-  expect(await exists(path.join(root, '.omniagents'))).toBeNull();
+  expect(await exists(path.join(root, '.anyagents'))).toBeNull();
 });
 it('refuses symlink traversal in sources, output parents, and ownership state', async () => {
   if (!linkSupported) return;
@@ -199,12 +199,12 @@ it('rolls back outputs on a late write failure and releases the lock', async () 
   if (!(await ready())) return;
   const before = await fs.readFile(path.join(root, '.mcp.json'), 'utf8');
   const stateBefore = await fs.readFile(
-    path.join(root, '.omniagents/state.json'),
+    path.join(root, '.anyagents/state.json'),
     'utf8',
   );
   await fs.writeFile(
-    path.join(root, '.ai/mcp.toml'),
-    'version=1\n[mcp.test]\ntransport="stdio"\ncommand="node"\n',
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  test:\n    transport: stdio\n    command: node\n',
   );
   const originalRename = fs.rename;
   const spy = vi
@@ -218,9 +218,9 @@ it('rolls back outputs on a late write failure and releases the lock', async () 
   spy.mockRestore();
   expect(await fs.readFile(path.join(root, '.mcp.json'), 'utf8')).toBe(before);
   expect(
-    await fs.readFile(path.join(root, '.omniagents/state.json'), 'utf8'),
+    await fs.readFile(path.join(root, '.anyagents/state.json'), 'utf8'),
   ).toBe(stateBefore);
-  expect(await exists(path.join(root, '.omniagents/apply.lock'))).toBeNull();
+  expect(await exists(path.join(root, '.anyagents/apply.lock'))).toBeNull();
 });
 it('hashing is stable across traversal order and text line endings; binary bytes stay distinct', async () => {
   await fs.writeFile(path.join(root, 'a'), 'hello\r\nworld\r\n');
@@ -239,7 +239,7 @@ it('preflight conflicts leave no ownership directory and managed writes retain f
   await expect(apply(await ctx())).rejects.toMatchObject({
     code: 'DESTINATION_CONFLICT',
   });
-  expect(await exists(path.join(root, '.omniagents'))).toBeNull();
+  expect(await exists(path.join(root, '.anyagents'))).toBeNull();
   await fs.rm(path.join(root, 'CLAUDE.md'));
   if (!linkSupported) return;
   await apply(await ctx());
@@ -247,9 +247,19 @@ it('preflight conflicts leave no ownership directory and managed writes retain f
   const codex = path.join(root, '.codex/config.toml');
   await fs.chmod(codex, 0o600);
   await fs.writeFile(
-    path.join(root, '.ai/mcp.toml'),
-    'version=1\n[mcp.test]\ntransport="stdio"\ncommand="node"\n',
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  test:\n    transport: stdio\n    command: node\n',
   );
   await apply(await ctx());
   expect((await fs.stat(codex)).mode & 0o777).toBe(0o600);
+});
+
+it('checks CRLF project outputs on fresh checkouts without ownership state', async () => {
+  if (!(await ready())) return;
+  const filename = path.join(root, '.mcp.json');
+  const content = (await fs.readFile(filename, 'utf8')).replace(/\n/g, '\r\n');
+  await fs.writeFile(filename, content);
+  await fs.rm(path.join(root, '.anyagents'), { recursive: true });
+  expect((await plan(await ctx(), true)).issues).toEqual([]);
+  expect(await fs.readFile(filename, 'utf8')).toBe(content);
 });
