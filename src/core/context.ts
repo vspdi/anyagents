@@ -3,10 +3,10 @@ import path from 'node:path';
 import {
   type Config,
   configSchema,
-  toml,
   unknownConfig,
   validate,
 } from '../formats/canonical.js';
+import { yaml } from '../formats/yaml.js';
 import { fail } from './errors.js';
 import { exists, inside, safePath } from './filesystem.js';
 export type Target = 'claude' | 'codex';
@@ -21,6 +21,7 @@ export interface Options {
   quiet?: boolean;
   apply?: boolean;
   probe?: boolean;
+  strict?: boolean;
 }
 export interface Context {
   root: string;
@@ -33,7 +34,7 @@ export interface Context {
 }
 export async function context(options: Options): Promise<Context> {
   const root = await fs.realpath(path.resolve(options.cwd ?? process.cwd()));
-  const configPath = path.resolve(root, options.config ?? 'omniagents.toml');
+  const configPath = path.resolve(root, options.config ?? 'anyagents.yaml');
   await safePath(root, configPath);
   const stat = await exists(configPath);
   if (options.config && !stat)
@@ -43,7 +44,7 @@ export async function context(options: Options): Promise<Context> {
       configPath,
     );
   const raw = stat
-    ? toml(await fs.readFile(configPath, 'utf8'), 'CONFIG_INVALID', configPath)
+    ? yaml(await fs.readFile(configPath, 'utf8'), 'CONFIG_INVALID', configPath)
     : { version: 1 };
   const config = validate(configSchema, raw, 'CONFIG_INVALID', configPath);
   const source = path.resolve(
@@ -56,7 +57,7 @@ export async function context(options: Options): Promise<Context> {
       'Canonical source must be a subdirectory inside project root.',
       source,
     );
-  const reserved = ['.claude', '.agents', '.codex', '.omniagents', '.git'];
+  const reserved = ['.claude', '.agents', '.codex', '.anyagents', '.git'];
   if (reserved.some((dir) => inside(path.join(root, dir), source)))
     fail(
       'CONFIG_INVALID',
