@@ -4,7 +4,7 @@
 
 ## Branch workflow
 
-PR titles must use Conventional Commits. `feat` triggers a minor release, `fix` and `perf` trigger a patch, and breaking changes (`!` or a `BREAKING CHANGE` footer) trigger a major release. Documentation, tests, and CI changes alone do not trigger releases.
+PR titles must use Conventional Commits. `feat` triggers a minor release, `fix`, `perf`, and `revert` trigger a patch, and breaking changes (`!` or a `BREAKING CHANGE` footer) trigger a major release. Documentation, tests, and CI changes alone do not trigger releases.
 
 1. Squash feature PRs into `dev`, retaining the validated PR title as the commit subject.
 2. Promote `dev` to `main` using a merge commit.
