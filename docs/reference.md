@@ -48,7 +48,7 @@ AnyAgents creates native symlinks and generated files for you to review and comm
 
 AnyAgents refuses unmanaged destination conflicts, including with `apply --force`. Move conflicting files yourself. Force can repair drifted managed generated files/entries; a replaced instruction link that became an ordinary file remains protected. `init --force` rewrites the scaffold: `anyagents.yaml` (comments and unknown fields are dropped), `.ai/AGENTS.md`, `.ai/mcp.yaml` (reset to no servers), `.ai/skills/example/`, and `.ai/skills/anyagents-authoring/`. Use it deliberately; back up instructions and MCP definitions first.
 
-Codex settings and unmanaged MCP server entries are preserved. TOML comments and formatting may change when managed entries change. Unrelated Codex edits do not cause drift. Canonical sources and output parent paths cannot traverse symlinks.
+Codex settings, unmanaged MCP server entries, comments, and formatting are preserved: only the managed `[mcp_servers.<name>]` tables are rewritten. If a managed server is written as an inline table or with dotted keys, AnyAgents cannot edit it in place and rewrites the whole file, dropping comments. Unrelated Codex edits do not cause drift. Canonical sources and output parent paths cannot traverse symlinks.
 
 After clone, correct links and exact generated output can be adopted without prior state. Removing a target leaves existing native output untouched. Removing a canonical server removes only its previously managed native entries. Apply preflights all selected targets, serializes with a lock, writes files atomically, rolls back caught failures, and writes state last. Power loss is not a transaction across all files.
 

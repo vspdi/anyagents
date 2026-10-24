@@ -310,3 +310,26 @@ it('removes scaffold files and created directories when init fails', async () =>
   expect(await exists(path.join(root, '.ai'))).toBeNull();
   expect(await exists(path.join(root, 'anyagents.yaml'))).toBeNull();
 });
+it('keeps comments and unrelated Codex settings when managed MCP entries change', async () => {
+  await setup();
+  const codex = path.join(root, '.codex/config.toml');
+  await fs.mkdir(path.dirname(codex));
+  const personal =
+    '# personal settings\nmodel = "gpt-5" # keep\n\n[profiles.fast]\nmodel = "mini"\n';
+  await fs.writeFile(codex, personal);
+  for (const url of ['https://one.invalid/mcp', 'https://two.invalid/mcp']) {
+    await fs.writeFile(
+      path.join(root, '.ai/mcp.yaml'),
+      `version: 1\nmcp:\n  docs:\n    transport: http\n    url: ${url}\n`,
+    );
+    if (!linkSupported) return;
+    await apply(await ctx());
+    const text = await fs.readFile(codex, 'utf8');
+    expect(text.startsWith(personal)).toBe(true);
+    expect(parse(text).mcp_servers).toEqual({ docs: { url } });
+  }
+  await fs.writeFile(path.join(root, '.ai/mcp.yaml'), 'version: 1\nmcp: {}\n');
+  await apply(await ctx());
+  expect(await fs.readFile(codex, 'utf8')).toBe(personal);
+  expect((await plan(await ctx(), true)).issues).toEqual([]);
+});

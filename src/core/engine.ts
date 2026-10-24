@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { adapters } from '../adapters/targets.js';
 import { version } from '../content/docs.js';
 import { type Mcp, toml, validate } from '../formats/canonical.js';
+import { replaceTomlTables } from '../formats/toml-edit.js';
 import type { Context, Target } from './context.js';
 import { AnyAgentsError, type ErrorCode, fail, warn } from './errors.js';
 import {
@@ -240,8 +241,18 @@ function codexMcp(
   if (Object.keys(existing).length) config.mcp_servers = existing;
   else delete config.mcp_servers;
   managed.generated[dest] = hash(stable(servers));
-  const changed = stable(rawServers ?? {}) !== stable(existing);
-  return current !== null && !changed ? current : stringify(config);
+  if (current === null) return stringify(config);
+  const before = (rawServers as Record<string, unknown> | undefined) ?? {};
+  const updates = Object.fromEntries(
+    [...new Set([...Object.keys(before), ...Object.keys(existing)])]
+      .filter((name) => stable(before[name]) !== stable(existing[name]))
+      .map((name) => [
+        name,
+        existing[name] as Record<string, unknown> | undefined,
+      ]),
+  );
+  if (!Object.keys(updates).length) return current;
+  return replaceTomlTables(current, 'mcp_servers', updates, config);
 }
 
 /** MCP configuration for one target; false when the destination is unusable. */
