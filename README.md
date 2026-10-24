@@ -6,7 +6,7 @@ Write shared content in `.ai/`. AnyAgents links instructions and skills into eac
 
 ## Requirements
 
-- Node.js 20 or later.
+- Node.js 22.12 or later.
 - Claude Code, Codex, or both.
 - On Windows, symlink privileges, normally enabled through Developer Mode.
 
@@ -118,7 +118,7 @@ pnpm test:pack
 pnpm test:coverage   # optional coverage report
 ```
 
-Biome checks lint and formatting. Vitest covers validation, native transforms, ownership, rollback, and the bundled CLI. CI tests Node.js 20, 22, and 24 on Linux, macOS, and Windows, including installation of the packed package.
+Biome checks lint and formatting. Vitest covers validation, native transforms, ownership, rollback, and the bundled CLI. CI tests Node.js 22 and 24 on Linux, macOS, and Windows, including installation of the packed package.
 
 Feature PRs target `dev` and use Conventional Commit titles. See [release workflow](docs/releasing.md) and [secure npm publishing](docs/npm-publishing.md) for branch and publishing rules.
 

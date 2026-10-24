@@ -76,6 +76,6 @@ Native mappings verified against [Claude MCP docs](https://code.claude.com/docs/
 
 ## Platform limits
 
-CI tests the packaged CLI on Linux, macOS, and Windows with Node.js 20, 22, and 24. Windows requires file symlink privileges, normally enabled through Developer Mode. If links are unavailable, the CLI reports `LINK_UNSUPPORTED` with remediation; it does not switch to copies.
+CI tests the packaged CLI on Linux, macOS, and Windows with Node.js 22 and 24. Windows requires file symlink privileges, normally enabled through Developer Mode. If links are unavailable, the CLI reports `LINK_UNSUPPORTED` with remediation; it does not switch to copies.
 
 The supported clients are Claude Code and Codex, using repository-level instructions, skills, STDIO/HTTP MCP, and local-source marketplace authoring. Global sync, other clients, nested inheritance, skill downloads, watch mode, and uninstall are outside the current scope.

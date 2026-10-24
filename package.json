@@ -15,7 +15,7 @@
     "third-party-licenses"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "packageManager": "pnpm@10.17.1",
   "repository": {
@@ -43,17 +43,17 @@
     "@semantic-release/npm": "^13.2.0",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "^24.19.2",
-    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/coverage-v8": "^5.0.5",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "commander": "^14.0.0",
+    "commander": "^15.0.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "semantic-release": "^25.0.9",
     "smol-toml": "^1.9.1",
-    "tsup": "^8.5.0",
+    "tsup": "^9.0.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.7",
-    "vitest": "^4.1.12",
+    "vitest": "^5.0.5",
     "yaml": "^2.8.1",
     "zod": "^4.6.7"
   }
