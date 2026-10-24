@@ -163,3 +163,20 @@ it('checks fresh checkouts read-only and strict warnings fail CI', {
     ),
   ).toContain('check --strict');
 });
+it('explains failures: missing roots are usage errors and --verbose shows causes', async () => {
+  const missing = run('check', '--cwd', path.join(root, 'missing'), '--json');
+  expect(missing.status).toBe(2);
+  expect(JSON.parse(missing.stderr).code).toBe('USAGE_ERROR');
+  const config = path.join(root, 'config-dir');
+  await fs.mkdir(config);
+  const quiet = run('check', '--config', config, '--json');
+  expect(quiet.status).toBe(1);
+  expect(JSON.parse(quiet.stderr)).not.toHaveProperty('cause');
+  const verbose = run('check', '--config', config, '--json', '--verbose');
+  expect(JSON.parse(verbose.stderr)).toMatchObject({
+    code: 'APPLY_FAILED',
+    cause: expect.stringContaining('EISDIR'),
+  });
+  expect(run('--no-color', '--version').status).toBe(0);
+  expect(run('--help').stdout).not.toContain('--no-color');
+});

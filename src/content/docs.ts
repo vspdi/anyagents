@@ -1,4 +1,6 @@
 import pkg from '../../package.json' with { type: 'json' };
+import { adapters, projectOutputs } from '../adapters/targets.js';
+import type { Target } from '../core/context.js';
 import { authoringFiles, authoringGuide, ciGuide } from './authoring.js';
 export const version = pkg.version;
 export const templates: Record<string, string> = {
@@ -17,15 +19,19 @@ export const templates: Record<string, string> = {
     'version: 1\nmcp:\n  project-docs:\n    transport: http\n    url: https://example.invalid/mcp\n    headers:\n      Authorization: Bearer ${PROJECT_DOCS_TOKEN}\n',
 };
 export function instructions(source: string): string {
-  return `# Repository instructions\n\nAdd repository-specific guidance here.\n\n## AnyAgents authoring contract\n\nThis repository uses AnyAgents to share instructions, skills, and MCP configuration across Claude Code and Codex.\n\n- Edit \`${source}/AGENTS.md\` for shared repository instructions.\n- Add skills under \`${source}/skills/<name>/SKILL.md\`.\n- Add MCP servers to \`${source}/mcp.yaml\`.\n- Configure source and targets in \`anyagents.yaml\`.\n- Author canonical sources only; do not edit linked or generated native destinations.\n\nBefore authoring unfamiliar assets, run:\n\n\`\`\`sh\nnpx anyagents explain authoring\nnpx anyagents explain skills\nnpx anyagents explain mcp\nnpx anyagents schema config\nnpx anyagents schema mcp\nnpx anyagents schema skill\nnpx anyagents template skill\nnpx anyagents template mcp-stdio\n\`\`\`\n\nFor plugins and marketplaces, run \`npx anyagents explain marketplaces\`, \`npx anyagents explain plugins\`, and \`npx anyagents explain ci\`. The bundled anyagents-authoring skill describes their scoped definitions.\n\nAfter canonical changes, run \`npx anyagents apply\` (or \`apply --target <current-target>\`), then \`npx anyagents check\`. Report changed canonical files and verification results.\n`;
+  return `# Repository instructions\n\nAdd repository-specific guidance here.\n\n## AnyAgents authoring contract\n\nThis repository uses AnyAgents to share instructions, skills, and MCP configuration across Claude Code and Codex.\n\n- Edit \`${source}/AGENTS.md\` for shared repository instructions.\n- Add skills under \`${source}/skills/<name>/SKILL.md\`.\n- Add MCP servers to \`${source}/mcp.yaml\`.\n- Configure source and targets in \`anyagents.yaml\`.\n- Author canonical sources only; do not edit linked or generated native destinations.\n\nBefore authoring unfamiliar assets, run:\n\n\`\`\`sh\nnpx anyagents explain authoring\nnpx anyagents explain skills\nnpx anyagents explain mcp\nnpx anyagents schema config\nnpx anyagents schema mcp\nnpx anyagents schema skill\nnpx anyagents template skill\nnpx anyagents template mcp-stdio\n\`\`\`\n\nFor plugins and marketplaces, run \`npx anyagents explain marketplaces\`, \`npx anyagents explain plugins\`, and \`npx anyagents explain ci\`. The bundled anyagents-authoring skill describes their scoped definitions.\n\nAfter canonical changes, run \`npx anyagents apply\`, then \`npx anyagents check\`. If you applied a single target with \`apply --target <target>\`, verify it with \`check --target <target>\` and run a full \`apply\` before committing. Report changed canonical files and verification results.\n`;
 }
-const outputs = [
-  'CLAUDE.md',
-  '.claude/skills',
-  '.mcp.json',
-  'AGENTS.md',
-  '.agents/skills',
-  '.codex/config.toml',
+const targetOutputs = (target: Target) =>
+  projectOutputs(target).map((output) => output.path);
+const projectPaths = [...targetOutputs('claude'), ...targetOutputs('codex')];
+const bundlePaths = (['claude', 'codex'] as const).map(
+  (target) => `<output>/plugins/${target}/<id>/`,
+);
+const marketplacePaths = [
+  ...(['claude', 'codex'] as const).map(
+    (target) => `<output>/${adapters[target].catalogPath}`,
+  ),
+  ...bundlePaths,
 ];
 export interface Explanation {
   topic: string;
@@ -44,6 +50,10 @@ function topic(
   structure: string,
   example: string,
   commonMistakes: string[],
+  {
+    nativeOutputs = projectPaths,
+    commands = ['anyagents apply', 'anyagents check'],
+  }: { nativeOutputs?: string[]; commands?: string[] } = {},
 ): Explanation {
   return {
     topic: name,
@@ -51,8 +61,8 @@ function topic(
     canonicalPath,
     structure,
     examples: [example],
-    nativeOutputs: outputs,
-    commands: ['anyagents apply', 'anyagents check'],
+    nativeOutputs,
+    commands,
     commonMistakes,
   };
 }
@@ -64,6 +74,7 @@ export const explanations: Record<string, Explanation> = {
     authoringGuide,
     templates.marketplace,
     ['Editing generated catalogs.', 'Missing Codex category or policy.'],
+    { nativeOutputs: marketplacePaths },
   ),
   plugins: topic(
     'plugins',
@@ -75,6 +86,7 @@ export const explanations: Record<string, Explanation> = {
       'Mixing project and plugin MCP.',
       'Overriding canonical fields in detail.',
     ],
+    { nativeOutputs: bundlePaths },
   ),
   ci: topic(
     'ci',
@@ -83,6 +95,7 @@ export const explanations: Record<string, Explanation> = {
     ciGuide,
     'anyagents check --strict',
     ['Running apply before check in CI.'],
+    { commands: ['anyagents check --strict'] },
   ),
   concepts: topic(
     'concepts',
@@ -110,6 +123,9 @@ export const explanations: Record<string, Explanation> = {
       'Directory/frontmatter name mismatch.',
       'Missing SKILL.md or frontmatter.',
     ],
+    {
+      nativeOutputs: [adapters.claude.skillsPath, adapters.codex.skillsPath],
+    },
   ),
   mcp: topic(
     'mcp',
@@ -122,6 +138,7 @@ export const explanations: Record<string, Explanation> = {
       'Unsupported embedded placeholder mappings.',
       'Executing untrusted MCP commands.',
     ],
+    { nativeOutputs: [adapters.claude.mcpPath, adapters.codex.mcpPath] },
   ),
   authoring: topic(
     'authoring',
@@ -138,7 +155,7 @@ export const explanations: Record<string, Explanation> = {
     'ownership',
     'Refuse unmanaged conflicts; force repairs only previously managed generated entries.',
     '.anyagents/state.json',
-    'State records links, generated hashes, individual Codex MCP entry hashes, and marketplace artifact hashes. CI checks do not require this local state. State is ignored. Exact generated content and correct links can be adopted after clone. Unrelated Codex settings/servers remain intact. TOML comments may be reformatted on a managed change. State commits only after successful execution; failed writes roll back. Removing targets leaves their outputs untouched. No uninstall in v0.1.',
+    'State records links, generated hashes, individual Codex MCP entry hashes, and marketplace artifact hashes. CI checks do not require this local state. State is Git-ignored. Exact generated content and correct links can be adopted after clone. Unrelated Codex settings/servers remain intact. TOML comments may be reformatted on a managed change. State commits only after successful execution; failed writes roll back. Removing targets leaves their outputs untouched. There is no uninstall command.',
     templates.config,
     [
       'Using --force to overwrite unmanaged files.',
@@ -152,6 +169,7 @@ export const explanations: Record<string, Explanation> = {
     'Relative instruction/skill symlinks; deterministic project MCP JSON. The entire .mcp.json is owned. cwd cannot be mapped portably.',
     templates['mcp-stdio'],
     ['Existing unmanaged .mcp.json.', 'Expecting cwd to work in Claude.'],
+    { nativeOutputs: targetOutputs('claude') },
   ),
   'target codex': topic(
     'target codex',
@@ -163,5 +181,6 @@ export const explanations: Record<string, Explanation> = {
       'Treating static http_headers as environment expansion.',
       'Overwriting unrelated Codex config.',
     ],
+    { nativeOutputs: targetOutputs('codex') },
   ),
 };

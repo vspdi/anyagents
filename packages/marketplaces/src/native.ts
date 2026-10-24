@@ -137,3 +137,61 @@ export const catalogManifest = (
     ]),
   );
 };
+/** The fields of a canonical MCP server that plugin packaging relies on. */
+export interface PluginServer {
+  transport: 'stdio' | 'http';
+  enabled: boolean;
+}
+const replaceDeep = (value: unknown, from: string, to: string): unknown =>
+  typeof value === 'string'
+    ? value.replaceAll(from, to)
+    : Array.isArray(value)
+      ? value.map((item) => replaceDeep(item, from, to))
+      : isObject(value)
+        ? Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [
+              key,
+              replaceDeep(item, from, to),
+            ]),
+          )
+        : value;
+/**
+ * Builds a plugin's native MCP document. Claude servers use the project
+ * mapping (`toClaude`) with `${PLUGIN_ROOT}` renamed to Claude's variable;
+ * Codex servers follow the Agent Plugins MCP schema.
+ */
+export const pluginMcpDocument = <S extends PluginServer>(
+  target: Target,
+  servers: Record<string, S>,
+  toClaude: (server: S) => Record<string, unknown>,
+  path?: string,
+): Record<string, unknown> => {
+  const mcpServers = Object.fromEntries(
+    Object.entries(servers)
+      .filter(([, server]) => server.enabled)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, server]) => {
+        if (target === 'claude')
+          return [
+            name,
+            replaceDeep(
+              toClaude(server),
+              '${PLUGIN_ROOT}',
+              '${CLAUDE_PLUGIN_ROOT}',
+            ),
+          ];
+        const { transport, enabled: _enabled, ...fields } = server;
+        return [
+          name,
+          {
+            type: transport === 'http' ? 'streamable-http' : 'stdio',
+            ...fields,
+          },
+        ];
+      }),
+  );
+  if (target === 'claude') return { mcpServers };
+  const document = { $schema: mcpJsonSchema.$id, mcpServers };
+  validateOfficial('mcp', document, path);
+  return document;
+};
