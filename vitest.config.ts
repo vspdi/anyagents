@@ -9,5 +9,13 @@ export default defineConfig({
           : undefined,
     },
   ],
-  test: { fileParallelism: false, include: ['tests/**/*.test.{ts,mjs}'] },
+  test: {
+    fileParallelism: false,
+    include: ['tests/**/*.test.{ts,mjs}'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
+      reporter: ['text-summary', 'html'],
+    },
+  },
 });

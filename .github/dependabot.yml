@@ -11,6 +11,8 @@ updates:
         versions: [">=9"]
       - dependency-name: vitest
         versions: [">=5"]
+      - dependency-name: "@vitest/coverage-v8"
+        versions: [">=5"]
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
       - dependency-name: commander
