@@ -19,6 +19,8 @@ npx anyagents init
 npx anyagents check
 ```
 
+`npx anyagents` downloads the latest release. To pin a version for your team and CI, add `anyagents` as an exact-version dev dependency; `npx anyagents` then runs the installed version.
+
 `init` creates the shared sources and project configuration, then applies them to Claude Code and Codex:
 
 ```text
