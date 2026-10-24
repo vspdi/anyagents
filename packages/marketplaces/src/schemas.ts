@@ -200,3 +200,43 @@ export const nativeClaudePluginSchema = z
 export type Marketplace = z.infer<typeof marketplaceSchema>;
 export type Plugin = z.infer<typeof pluginSchema>;
 export type Target = 'claude' | 'codex';
+/** Hook events accepted in plugin hook files. */
+export const hookEvents = [
+  'SessionStart',
+  'SessionEnd',
+  'PreToolUse',
+  'PostToolUse',
+  'PostToolUseFailure',
+  'UserPromptSubmit',
+  'Stop',
+  'SubagentStart',
+  'SubagentStop',
+  'PreCompact',
+  'Notification',
+  'PermissionRequest',
+] as const;
+/** Plugin hook file: only command handlers are supported. */
+export const hooksSchema = z
+  .object({
+    hooks: z.partialRecord(
+      z.enum(hookEvents),
+      z.array(
+        z
+          .object({
+            matcher: z.string().optional(),
+            hooks: z.array(
+              z
+                .object({
+                  type: z.literal('command'),
+                  command: text,
+                  timeout: z.number().positive().optional(),
+                  statusMessage: z.string().optional(),
+                })
+                .strict(),
+            ),
+          })
+          .strict(),
+      ),
+    ),
+  })
+  .strict();

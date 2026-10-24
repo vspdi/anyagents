@@ -104,16 +104,11 @@ export async function sourceHash(
   const h = createHash('sha256').update(`1:${version}`);
   const relative = (p: string) =>
     path.relative(root, p).split(path.sep).join('/');
-  for (const p of paths.sort((a, b) =>
+  for (const p of [...paths].sort((a, b) =>
     relative(a) < relative(b) ? -1 : relative(a) > relative(b) ? 1 : 0,
   )) {
     const name = Buffer.from(path.relative(root, p).split(path.sep).join('/'));
-    const bytes = await fs.readFile(p);
-    const decoded = bytes.toString('utf8');
-    const content =
-      !bytes.includes(0) && Buffer.from(decoded).equals(bytes)
-        ? Buffer.from(decoded.replace(/\r\n/g, '\n'))
-        : bytes;
+    const content = normalizeLineEndings(await fs.readFile(p));
     h.update(`${name.length}:`)
       .update(name)
       .update(`${content.length}:`)
@@ -122,14 +117,19 @@ export async function sourceHash(
   return `sha256:${h.digest('hex')}`;
 }
 
-export const artifactHash = (content: Buffer): string => {
+/**
+ * Converts CRLF to LF in UTF-8 text so Git line-ending conversion does not
+ * read as drift. Binary content (NUL bytes or invalid UTF-8) is unchanged.
+ */
+export const normalizeLineEndings = (content: Buffer): Buffer => {
   const text = content.toString('utf8');
-  return hash(
-    !content.includes(0) && Buffer.from(text).equals(content)
-      ? text.replace(/\r\n/g, '\n')
-      : content,
-  );
+  return !content.includes(0) && Buffer.from(text).equals(content)
+    ? Buffer.from(text.replace(/\r\n/g, '\n'))
+    : content;
 };
+
+export const artifactHash = (content: Buffer): string =>
+  hash(normalizeLineEndings(content));
 
 export const pathIdentity = (value: string): string =>
   process.platform === 'win32' ? value.toLowerCase() : value;

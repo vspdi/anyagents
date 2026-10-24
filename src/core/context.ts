@@ -10,6 +10,10 @@ import { yaml } from '../formats/yaml.js';
 import { fail } from './errors.js';
 import { exists, inside, safePath } from './filesystem.js';
 export type Target = 'claude' | 'codex';
+/** Directories that hold native outputs, state, or Git data. */
+const reservedDirs = ['.claude', '.agents', '.codex', '.anyagents', '.git'];
+export const overlapsReserved = (root: string, candidate: string): boolean =>
+  reservedDirs.some((dir) => inside(path.join(root, dir), candidate));
 export interface Options {
   cwd?: string;
   config?: string;
@@ -33,7 +37,10 @@ export interface Context {
   force: boolean;
 }
 export async function context(options: Options): Promise<Context> {
-  const root = await fs.realpath(path.resolve(options.cwd ?? process.cwd()));
+  const requested = path.resolve(options.cwd ?? process.cwd());
+  if (!(await exists(requested))?.isDirectory())
+    fail('USAGE_ERROR', 'Project root is not a directory.', requested);
+  const root = await fs.realpath(requested);
   const configPath = path.resolve(root, options.config ?? 'anyagents.yaml');
   await safePath(root, configPath);
   const stat = await exists(configPath);
@@ -57,8 +64,7 @@ export async function context(options: Options): Promise<Context> {
       'Canonical source must be a subdirectory inside project root.',
       source,
     );
-  const reserved = ['.claude', '.agents', '.codex', '.anyagents', '.git'];
-  if (reserved.some((dir) => inside(path.join(root, dir), source)))
+  if (overlapsReserved(root, source))
     fail(
       'CONFIG_INVALID',
       'Canonical source overlaps a reserved destination.',

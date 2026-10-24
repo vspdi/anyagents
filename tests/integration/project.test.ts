@@ -263,3 +263,73 @@ it('checks CRLF project outputs on fresh checkouts without ownership state', asy
   expect((await plan(await ctx(), true)).issues).toEqual([]);
   expect(await fs.readFile(filename, 'utf8')).toBe(content);
 });
+it('reports a shared drift issue once even when several targets drift', async () => {
+  if (!(await ready())) return;
+  await fs.writeFile(
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  docs:\n    transport: http\n    url: https://example.invalid/mcp\n',
+  );
+  const { issues } = await plan(await ctx(), true);
+  const keys = issues.map((i) => `${i.code}|${i.path}|${i.message}`);
+  expect(new Set(keys).size).toBe(keys.length);
+  expect(
+    issues.filter((i) => i.message.startsWith('Ownership state differs')),
+  ).toHaveLength(1);
+});
+it('reports paths it could not restore when rollback itself fails', async () => {
+  if (!(await ready())) return;
+  await fs.writeFile(
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  docs:\n    transport: http\n    url: https://example.invalid/mcp\n',
+  );
+  const mcpPath = path.join(root, '.mcp.json');
+  const rename = fs.rename;
+  const writeFile = fs.writeFile;
+  vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+    if (String(to).endsWith('state.json')) throw new Error('simulated failure');
+    return rename(from, to);
+  });
+  vi.spyOn(fs, 'writeFile').mockImplementation(async (file, ...rest) => {
+    if (String(file) === mcpPath) throw new Error('restore failure');
+    return writeFile(file, ...rest);
+  });
+  const failure = await apply(await ctx()).catch((e: unknown) => e);
+  expect(failure).toMatchObject({ code: 'APPLY_FAILED' });
+  expect((failure as Error).message).toContain('.mcp.json');
+  expect(((failure as Error).cause as Error).message).toBe('simulated failure');
+  expect(await exists(path.join(root, '.anyagents/apply.lock'))).toBeNull();
+});
+it('removes scaffold files and created directories when init fails', async () => {
+  const rename = fs.rename;
+  vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+    if (String(to).endsWith(path.join('references', 'ci.md')))
+      throw new Error('simulated failure');
+    return rename(from, to);
+  });
+  await expect(init(await ctx(), true)).rejects.toThrow('simulated failure');
+  expect(await exists(path.join(root, '.ai'))).toBeNull();
+  expect(await exists(path.join(root, 'anyagents.yaml'))).toBeNull();
+});
+it('keeps comments and unrelated Codex settings when managed MCP entries change', async () => {
+  await setup();
+  const codex = path.join(root, '.codex/config.toml');
+  await fs.mkdir(path.dirname(codex));
+  const personal =
+    '# personal settings\nmodel = "gpt-5" # keep\n\n[profiles.fast]\nmodel = "mini"\n';
+  await fs.writeFile(codex, personal);
+  for (const url of ['https://one.invalid/mcp', 'https://two.invalid/mcp']) {
+    await fs.writeFile(
+      path.join(root, '.ai/mcp.yaml'),
+      `version: 1\nmcp:\n  docs:\n    transport: http\n    url: ${url}\n`,
+    );
+    if (!linkSupported) return;
+    await apply(await ctx());
+    const text = await fs.readFile(codex, 'utf8');
+    expect(text.startsWith(personal)).toBe(true);
+    expect(parse(text).mcp_servers).toEqual({ docs: { url } });
+  }
+  await fs.writeFile(path.join(root, '.ai/mcp.yaml'), 'version: 1\nmcp: {}\n');
+  await apply(await ctx());
+  expect(await fs.readFile(codex, 'utf8')).toBe(personal);
+  expect((await plan(await ctx(), true)).issues).toEqual([]);
+});

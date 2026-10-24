@@ -1,9 +1,9 @@
 import { parseDocument } from 'yaml';
-import { fail } from '../core/errors.js';
+import { type ErrorCode, fail } from '../core/errors.js';
 
 export const yaml = (
   text: string,
-  code = 'CONFIG_INVALID',
+  code: ErrorCode = 'CONFIG_INVALID',
   path?: string,
 ): Record<string, unknown> => {
   const doc = parseDocument(text, {

@@ -6,7 +6,7 @@ Write shared content in `.ai/`. AnyAgents links instructions and skills into eac
 
 ## Requirements
 
-- Node.js 20 or later.
+- Node.js 22.12 or later.
 - Claude Code, Codex, or both.
 - On Windows, symlink privileges, normally enabled through Developer Mode.
 
@@ -19,13 +19,17 @@ npx anyagents init
 npx anyagents check
 ```
 
+`npx anyagents` downloads the latest release. To pin a version for your team and CI, add `anyagents` as an exact-version dev dependency; `npx anyagents` then runs the installed version.
+
 `init` creates the shared sources and project configuration, then applies them to Claude Code and Codex:
 
 ```text
 .ai/
 ├── AGENTS.md
 ├── skills/example/SKILL.md
-├── skills/anyagents-authoring/SKILL.md
+├── skills/anyagents-authoring/
+│   ├── SKILL.md
+│   └── references/{definitions,ci}.md
 └── mcp.yaml
 anyagents.yaml
 ```
@@ -46,7 +50,7 @@ npx anyagents apply
 npx anyagents check
 ```
 
-Edit `.ai/AGENTS.md` for instructions, `.ai/skills/` for skills, and `.ai/mcp.yaml` for MCP servers. Review and commit the shared sources, project configuration, and native files using your normal Git workflow. AnyAgents does not create Git commits; local ownership state is ignored.
+Edit `.ai/AGENTS.md` for instructions, `.ai/skills/` for skills, and `.ai/mcp.yaml` for MCP servers. Review and commit the shared sources, project configuration, and native files using your normal Git workflow. AnyAgents does not create Git commits; local ownership state (`.anyagents/`) is Git-ignored.
 
 If your repository already has instructions, skills, or MCP configuration, AnyAgents refuses conflicting unmanaged files. See [ownership and conflicts](docs/reference.md#ownership-and-git-behavior) before initializing an existing setup. `--force` does not bypass unmanaged-output protection.
 
@@ -113,9 +117,10 @@ pnpm typecheck
 pnpm build
 pnpm test
 pnpm test:pack
+pnpm test:coverage   # optional coverage report
 ```
 
-Biome checks lint and formatting. Vitest covers validation, native transforms, ownership, rollback, and the bundled CLI. CI tests Node.js 20 and 22 on Linux, macOS, and Windows, including installation of the packed package.
+Biome checks lint and formatting. Vitest covers validation, native transforms, ownership, rollback, and the bundled CLI. CI tests Node.js 22 and 24 on Linux, macOS, and Windows, including installation of the packed package.
 
 Feature PRs target `dev` and use Conventional Commit titles. See [release workflow](docs/releasing.md) and [secure npm publishing](docs/npm-publishing.md) for branch and publishing rules.
 

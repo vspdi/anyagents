@@ -1,6 +1,6 @@
 # Installation alternatives
 
-The usual installation is [npm through npx](../README.md#quick-start). Node.js 20 or later is required. Windows also needs symlink privileges, normally enabled through Developer Mode.
+The usual installation is [npm through npx](../README.md#quick-start). Node.js 22.12 or later is required. Windows also needs symlink privileges, normally enabled through Developer Mode.
 
 ## Install a release tarball
 
