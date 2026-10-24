@@ -252,7 +252,13 @@ function codexMcp(
       ]),
   );
   if (!Object.keys(updates).length) return current;
-  return replaceTomlTables(current, 'mcp_servers', updates, config);
+  const edited = replaceTomlTables(current, 'mcp_servers', updates, config);
+  if (!edited.preserved && !checking)
+    warn(
+      ctx.warnings,
+      `${dest} could not be edited in place and was rewritten; its comments and formatting were not kept.`,
+    );
+  return edited.text;
 }
 
 /** MCP configuration for one target; false when the destination is unusable. */

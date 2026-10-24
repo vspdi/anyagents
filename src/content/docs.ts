@@ -155,7 +155,7 @@ export const explanations: Record<string, Explanation> = {
     'ownership',
     'Refuse unmanaged conflicts; force repairs only previously managed generated entries.',
     '.anyagents/state.json',
-    'State records links, generated hashes, individual Codex MCP entry hashes, and marketplace artifact hashes. CI checks do not require this local state. State is Git-ignored. Exact generated content and correct links can be adopted after clone. Unrelated Codex settings/servers and comments remain intact; only managed [mcp_servers.<name>] tables are rewritten (inline-table or dotted-key servers force a full rewrite). State commits only after successful execution; failed writes roll back. Removing targets leaves their outputs untouched. There is no uninstall command.',
+    'State records links, generated hashes, individual Codex MCP entry hashes, and marketplace artifact hashes. CI checks do not require this local state. State is Git-ignored. Exact generated content and correct links can be adopted after clone. Unrelated Codex settings/servers and comments remain intact; only the lines of managed mcp_servers entries change (verified by re-parsing; a full rewrite, if ever needed, is reported as a warning). State commits only after successful execution; failed writes roll back. Removing targets leaves their outputs untouched. There is no uninstall command.',
     templates.config,
     [
       'Using --force to overwrite unmanaged files.',

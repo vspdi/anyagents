@@ -21,8 +21,16 @@ const expectedFrom = (
 const edit = (
   text: string,
   updates: Record<string, Record<string, unknown> | undefined>,
-) =>
-  replaceTomlTables(text, 'mcp_servers', updates, expectedFrom(text, updates));
+) => {
+  const result = replaceTomlTables(
+    text,
+    'mcp_servers',
+    updates,
+    expectedFrom(text, updates),
+  );
+  expect(result.preserved).toBe(true);
+  return result.text;
+};
 
 it('replaces a managed table in place, including its subtables, and keeps comments', () => {
   const text = [
@@ -85,12 +93,78 @@ it('appends new servers and removes old ones, keeping other text', () => {
     mcp_servers: { added: { command: 'y', args: ['a'] } },
   });
 });
-it('falls back to a full rewrite when servers use inline tables or dotted keys', () => {
-  for (const text of [
-    '# lost\nmcp_servers = { docs = { command = "x" } }\n',
-    '# lost\nmcp_servers.docs.command = "x"\n',
-  ]) {
+it('edits inline-table and dotted-key servers in place, keeping comments', () => {
+  const cases = [
+    // Inline table holding several servers: all become sections.
+    '# keep\nmodel = "x" # keep too\nmcp_servers = { docs = { command = "x" }, mine = { command = "m" } }\n\n# profile\n[profiles.fast]\nmodel = "mini"\n',
+    // Dotted keys at the root.
+    '# keep\nmodel = "x" # keep too\nmcp_servers.docs.command = "x"\nmcp_servers.mine.command = "m"\n\n# profile\n[profiles.fast]\nmodel = "mini"\n',
+    // Dotted and inline entries under a [mcp_servers] header.
+    '# keep\nmodel = "x" # keep too\n\n[mcp_servers]\ndocs.command = "x"\nmine = { command = "m" }\n\n# profile\n[profiles.fast]\nmodel = "mini"\n',
+    // Multi-line array value inside the managed entry.
+    '# keep\nmodel = "x" # keep too\n\n[mcp_servers.docs]\ncommand = "x"\nargs = [\n  "[not-a-header]",\n  "b",\n]\n\n[mcp_servers.mine]\ncommand = "m"\n\n# profile\n[profiles.fast]\nmodel = "mini"\n',
+  ];
+  for (const text of cases) {
     const result = edit(text, { docs: { command: 'y' } });
-    expect(parse(result)).toEqual({ mcp_servers: { docs: { command: 'y' } } });
+    expect(result).toContain('# keep\nmodel = "x" # keep too\n');
+    expect(result).toContain('# profile\n[profiles.fast]');
+    expect(parse(result)).toEqual({
+      model: 'x',
+      mcp_servers: { docs: { command: 'y' }, mine: { command: 'm' } },
+      profiles: { fast: { model: 'mini' } },
+    });
   }
+});
+it('removes the last server, including an emptied [mcp_servers] header', () => {
+  const text = '# keep\n[mcp_servers]\ndocs.command = "x"\n\n# tail\n';
+  const result = edit(text, { docs: undefined });
+  expect(result).toBe('# keep\n\n# tail\n');
+});
+it('reports when it has to rewrite the whole document', () => {
+  const text = '# lost\n[mcp_servers.docs]\ncommand = "x"\n';
+  const result = replaceTomlTables(
+    text,
+    'mcp_servers',
+    {},
+    {
+      mcp_servers: { docs: { command: 'y' } },
+    },
+  );
+  expect(result.preserved).toBe(false);
+  expect(parse(result.text)).toEqual({
+    mcp_servers: { docs: { command: 'y' } },
+  });
+});
+it('keeps comments for every combination of server layout and change', () => {
+  // Each layout writes servers `a` and `b` in a different valid TOML form.
+  const layouts: Record<string, string> = {
+    sections:
+      '[mcp_servers.a]\ncommand = "a"\n\n[mcp_servers.b]\ncommand = "b"\n',
+    subtables:
+      '[mcp_servers.a]\ncommand = "a"\n[mcp_servers.a.env]\nK = "v"\n\n[mcp_servers.b]\ncommand = "b"\n',
+    header: '[mcp_servers]\na.command = "a"\nb = { command = "b" }\n',
+    rootDotted: 'mcp_servers.a.command = "a"\nmcp_servers.b.command = "b"\n',
+    rootInline:
+      'mcp_servers = { a = { command = "a" }, b = { command = "b" } }\n',
+    multiline:
+      '[mcp_servers.a]\ncommand = "a"\nargs = [\n  "x",\n]\n\n[mcp_servers.b]\ncommand = "b"\n',
+  };
+  const changes: Record<string, Record<string, unknown> | undefined>[] = [
+    { a: { command: 'changed' } },
+    { a: undefined },
+    { a: undefined, b: undefined },
+    { c: { url: 'https://c.invalid' } },
+    { a: { command: 'changed' }, b: undefined, c: { command: 'c' } },
+  ];
+  for (const [name, servers] of Object.entries(layouts))
+    for (const updates of changes) {
+      // Root-level forms must precede any header, as TOML requires.
+      const rootLevel = name.startsWith('root');
+      const text = rootLevel
+        ? `# top\nmodel = "x" # inline\n${servers}\n# profile\n[profiles.fast]\nmodel = "mini" # m\n`
+        : `# top\nmodel = "x" # inline\n\n# profile\n[profiles.fast]\nmodel = "mini" # m\n\n${servers}`;
+      const result = edit(text, updates);
+      for (const comment of ['# top', '# inline', '# profile', '# m'])
+        expect(result, `${name} ${JSON.stringify(updates)}`).toContain(comment);
+    }
 });
