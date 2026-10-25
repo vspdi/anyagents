@@ -83,7 +83,7 @@ References: [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
 ## Dependency audit limit
 
-The publishing hardening updates Vitest to 4.1.11 and esbuild to 0.28.1, addressing their reported advisories. The bundled CLI has no install-time production dependencies; libraries are bundled during the build. One high-severity, unpatched `braces` denial-of-service advisory remains in semantic-release's development dependency tree. It concerns deeply nested glob patterns; the current release configuration uses fixed rules. Treat this as an unresolved build-tool risk, monitor its advisory, and review any change that introduces user-controlled release patterns. A clean production-dependency audit does not establish that bundled source or build dependencies are safe.
+The bundled CLI has no install-time production dependencies; libraries are bundled during the build, so users' `npm audit` cannot see them. Run `pnpm audit` before each release: a fix in a bundled library (for example `ajv`'s `fast-uri`) only reaches users through a new release. `pnpm audit` reported no known vulnerabilities on October 24, 2026. A clean production-dependency audit does not establish that bundled source or build dependencies are safe.
 
 ## Repository maintenance
 

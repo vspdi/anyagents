@@ -50,12 +50,23 @@ export async function init(ctx: Context, noApply = false) {
       data: (await exists(p)) ? await fs.readFile(p) : null,
     })),
   );
+  const createdDirs = new Set<string>();
+  for (const [p] of entries)
+    for (
+      let dir = path.dirname(p);
+      !(await exists(dir));
+      dir = path.dirname(dir)
+    )
+      createdDirs.add(dir);
   try {
     for (const [p, content] of entries) await atomicWrite(p, content);
   } catch (e) {
     for (const item of previous)
       if (item.data) await fs.writeFile(item.p, item.data);
       else await fs.rm(item.p, { force: true });
+    // Deepest first, so parents are empty by the time they are removed.
+    for (const dir of [...createdDirs].sort((a, b) => b.length - a.length))
+      await fs.rmdir(dir).catch(() => {});
     throw e;
   }
   ctx.config = config;
