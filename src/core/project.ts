@@ -4,7 +4,7 @@ import { version } from '../content/docs.js';
 import { type Mcp, mcpSchema, skill, validate } from '../formats/canonical.js';
 import { yaml } from '../formats/yaml.js';
 import type { Context } from './context.js';
-import { fail } from './errors.js';
+import { fail, warnPlaintextBearer } from './errors.js';
 import { exists, files, safePath, sourceHash } from './filesystem.js';
 export async function inputs(
   ctx: Context,
@@ -52,16 +52,8 @@ export async function inputs(
     skill(await fs.readFile(p, 'utf8'), entry.name, ctx.warnings);
   }
   for (const server of Object.values(mcp.mcp))
-    if (server.transport === 'http') {
-      if (
-        Object.values(server.headers ?? {}).some(
-          (v) => /^Bearer\s+/.test(v) && !v.includes('${'),
-        )
-      )
-        ctx.warnings.push(
-          'MCP contains a possible plaintext bearer token. Prefer an environment placeholder.',
-        );
-    }
+    if (server.transport === 'http')
+      warnPlaintextBearer(ctx.warnings, server.headers, 'MCP');
   const canonical = [
     path.join(ctx.source, 'AGENTS.md'),
     path.join(ctx.source, 'mcp.yaml'),

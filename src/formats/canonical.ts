@@ -7,7 +7,7 @@ import {
 import { parse as parseToml } from 'smol-toml';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
-import { fail } from '../core/errors.js';
+import { type ErrorCode, fail, warn } from '../core/errors.js';
 
 const text = z.string().min(1).regex(/\S/, 'Expected nonblank text');
 const strings = z.record(z.string(), z.string());
@@ -72,7 +72,7 @@ export type Mcp = z.infer<typeof mcpSchema>;
 export type Server = z.infer<typeof serverSchema>;
 export function toml(
   text: string,
-  code = 'CONFIG_INVALID',
+  code: ErrorCode = 'CONFIG_INVALID',
   path?: string,
 ): Record<string, unknown> {
   try {
@@ -88,7 +88,7 @@ export function toml(
 export function validate<T>(
   schema: z.ZodType<T>,
   data: unknown,
-  code: string,
+  code: ErrorCode,
   path?: string,
 ): T {
   const result = schema.safeParse(data);
@@ -131,7 +131,7 @@ export function skill(
     );
   for (const key of Object.keys(metadata))
     if (!['name', 'description'].includes(key))
-      warnings.push(`Unknown skill field: ${directory}.${key}`);
+      warn(warnings, `Unknown skill field: ${directory}.${key}`);
 }
 export function unknownConfig(raw: Record<string, unknown>): string[] {
   const allowed: Record<string, string[]> = {

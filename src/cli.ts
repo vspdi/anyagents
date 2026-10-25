@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { MarketplaceError } from '@alchemisten/anyagents-marketplaces';
-import { Command, CommanderError } from 'commander';
+import { Command, CommanderError, Option } from 'commander';
+import { adapters, projectOutputs } from './adapters/targets.js';
 import { explanations, templates, version } from './content/docs.js';
 import { context, type Options } from './core/context.js';
 import { apply, plan } from './core/engine.js';
@@ -27,10 +28,12 @@ const program = new Command()
   )
   .option('--json', 'machine-readable output')
   .option('--quiet', 'suppress non-error output')
-  .option('--no-color', 'disable ANSI colors');
+  .option('--verbose', 'include underlying causes of unexpected errors')
+  // Output is never colored; the flag stays accepted so existing scripts work.
+  .addOption(new Option('--no-color').hideHelp());
 program.addHelpText(
   'after',
-  '\nAuthoring documentation:\n  anyagents explain <authoring|skills|mcp|config|ownership|plugins|marketplaces|ci>\n  anyagents schema <config|mcp|skill|marketplace|plugin|all>\n  anyagents template <skill|mcp-stdio|mcp-http|config|marketplace|plugin|authoring-skill>',
+  `\nAuthoring documentation:\n  anyagents explain [${Object.keys(explanations).join('|')}]\n  anyagents schema <${[...Object.keys(schemas), 'all'].join('|')}>\n  anyagents template <${Object.keys(templates).join('|')}>`,
 );
 program.exitOverride();
 program.configureOutput({ outputError: () => {} });
@@ -98,28 +101,13 @@ program
       state: string;
     }[] = [];
     for (const target of ctx.config.project ? ctx.targets : [])
-      for (const asset of ['instructions', 'skills', 'mcp']) {
-        const name =
-          target === 'claude'
-            ? asset === 'instructions'
-              ? 'CLAUDE.md'
-              : asset === 'skills'
-                ? '.claude/skills'
-                : '.mcp.json'
-            : asset === 'instructions'
-              ? 'AGENTS.md'
-              : asset === 'skills'
-                ? '.agents/skills'
-                : '.codex/config.toml';
+      for (const { asset, path: name, source } of projectOutputs(target)) {
         const p = path.join(ctx.root, name);
         await safePath(ctx.root, p, false);
         const stat = await exists(p);
         let state = stat ? 'present (run check to verify)' : 'missing';
         if (asset !== 'mcp' && stat?.isSymbolicLink()) {
-          const expected = path.join(
-            ctx.source,
-            asset === 'skills' ? 'skills' : 'AGENTS.md',
-          );
+          const expected = path.join(ctx.source, source);
           state =
             path.resolve(path.dirname(p), await fs.readlink(p)) === expected &&
             (await exists(expected))
@@ -134,12 +122,7 @@ program
         marketplace.output,
       );
       for (const target of ctx.targets) {
-        const filename = path.join(
-          root,
-          target === 'claude'
-            ? '.claude-plugin/marketplace.json'
-            : '.agents/plugins/marketplace.json',
-        );
+        const filename = path.join(root, adapters[target].catalogPath);
         await safePath(ctx.root, filename);
         rows.push({
           target,
@@ -192,12 +175,9 @@ program
     }
     const writableParents: Record<string, boolean> = {};
     for (const relative of [
-      'CLAUDE.md',
-      'AGENTS.md',
-      '.claude/skills',
-      '.agents/skills',
-      '.mcp.json',
-      '.codex/config.toml',
+      ...(['claude', 'codex'] as const).flatMap((target) =>
+        projectOutputs(target).map((output) => output.path),
+      ),
       '.anyagents/state.json',
     ]) {
       let parent = path.dirname(path.join(ctx.root, relative));
@@ -248,7 +228,7 @@ program
     output(
       opts.json
         ? doc
-        : `${doc.summary}\n\nCanonical path: ${doc.canonicalPath}\n${doc.structure}\n\n${doc.examples.join('\n')}\nNative outputs: ${doc.nativeOutputs.join(', ')}\nVerify: ${doc.commands.join('; ')}\nCommon mistakes: ${doc.commonMistakes.join('; ')}`,
+        : `${doc.summary}\n\nCanonical path: ${doc.canonicalPath}\n${doc.structure}\n\n${doc.examples.join('\n')}\nNative outputs: ${doc.nativeOutputs.join(', ')}\nVerify: ${doc.commands.join('; ')}\nCommon mistakes: ${doc.commonMistakes.join(' ')}`,
       opts,
     );
   });
@@ -291,10 +271,14 @@ program
           path.relative(ctx.root, path.join(ctx.source, p)),
         ),
         configPath: path.relative(ctx.root, ctx.configPath),
-        targetOutputs: {
-          claude: ['CLAUDE.md', '.claude/skills', '.mcp.json'],
-          codex: ['AGENTS.md', '.agents/skills', '.codex/config.toml'],
-        },
+        targetOutputs: Object.fromEntries(
+          Object.keys(adapters).map((target) => [
+            target,
+            projectOutputs(target as keyof typeof adapters).map(
+              (output) => output.path,
+            ),
+          ]),
+        ),
         explainTopics: Object.keys(explanations),
         schemaTopics: Object.keys(schemas),
         templateTopics: Object.keys(templates),
@@ -316,15 +300,25 @@ try {
           ? new AnyAgentsError('USAGE_ERROR', e.message)
           : new AnyAgentsError(
               'APPLY_FAILED',
-              'Operation failed. Run anyagents doctor and check filesystem permissions.',
+              'Operation failed. Run anyagents doctor, check filesystem permissions, or rerun with --verbose for the cause.',
             );
+    const verbose = process.argv.includes('--verbose');
+    // Unexpected errors keep their original cause; --verbose shows it.
+    const cause =
+      error === e ? error.cause : e instanceof CommanderError ? undefined : e;
+    const detail =
+      verbose && cause !== undefined
+        ? cause instanceof Error
+          ? (cause.stack ?? cause.message)
+          : String(cause)
+        : undefined;
     if (process.argv.includes('--json'))
       process.stderr.write(
-        `${JSON.stringify({ code: error.code, message: error.message, path: error.path })}\n`,
+        `${JSON.stringify({ code: error.code, message: error.message, path: error.path, ...(detail ? { cause: detail } : {}) })}\n`,
       );
     else
       process.stderr.write(
-        `${error.code}: ${error.message}${error.path ? ` (${error.path})` : ''}\n`,
+        `${error.code}: ${error.message}${error.path ? ` (${error.path})` : ''}\n${detail ? `Cause: ${detail}\n` : ''}`,
       );
     process.exitCode = error.code === 'USAGE_ERROR' ? 2 : 1;
   }
