@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@alchemisten/anyagents-marketplaces": "workspace:*",
-    "@biomejs/biome": "2.6.2",
+    "@biomejs/biome": "2.6.4",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/github": "^12.0.10",
     "@semantic-release/npm": "^13.2.0",
