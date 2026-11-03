@@ -10,11 +10,17 @@ project: false
 targets:
   claude: true
   codex: true
+  opencode: false
+  copilot: false
+opencode:
+  schema: v2
 marketplaces:
   personal:
     source: .ai/marketplace.yaml
     output: .
 ```
+
+`targets.claude` and `targets.codex` default to true; `targets.opencode` and `targets.copilot` default to false, so upgrading never writes new files. `opencode.schema` (`v2` default, or `v1`) selects where OpenCode MCP servers go in `opencode.json`. Targets that share a destination, such as `AGENTS.md`, `.agents/skills`, and the Claude/Copilot `.mcp.json`, must agree on it and plan it once.
 
 `project` defaults to true: validate and synchronize project instructions, skills, and `.ai/mcp.yaml`. Set it false for a standalone marketplace repository. Config source/output paths resolve relative to the config file. Multiple marketplaces use additional entries with disjoint output roots, such as `marketplaces/personal` and `marketplaces/team`. Map keys become native marketplace names.
 
@@ -59,13 +65,13 @@ detail:
 
 A plugin directory contains `plugin.yaml`, optional `mcp.yaml`, and assets under `skills/`, `assets/`, `scripts/`, `hooks/`, `agents/`, or `commands/`. Symlinks are rejected. Skills have ordinary `<id>/SKILL.md` directories and validated YAML frontmatter. Scripts and binary assets are copied; no commands are executed.
 
-Plugin `mcp.yaml` uses exactly the project MCP schema but only configures that plugin. Use `${PLUGIN_ROOT}/scripts/server.js` for bundled script paths; Claude output translates the root placeholder. Project MCP retains the project's native transform rules. Claude does not support canonical `cwd`; selected-target incompatibilities fail before writing.
+Plugin `mcp.yaml` uses exactly the project MCP schema but only configures that plugin. Use `${PLUGIN_ROOT}/scripts/server.js` for bundled script paths; Claude output translates the root placeholder. Project MCP retains the project's native transform rules. Claude and Copilot do not support canonical `cwd`; Copilot cannot expand URL placeholders; OpenCode cannot express `${NAME:-default}`. Selected-target incompatibilities fail before writing.
 
-`detail.claude` and `detail.codex` describe native additions on their containing object. Catalog details extend the catalog; entry details extend that catalog entry; plugin details extend its manifest. Codex plugin details become `extensions["com.openai"]` in portable `plugin.json`. Shared identity, source, version, and generated component paths cannot be overridden. Objects merge recursively, arrays replace, and null deletion is unsupported. Unknown fields fail validation; use the emitted schema to see supported details.
+`detail.claude`, `detail.codex`, `detail.copilot`, and `detail.opencode` describe native additions on their containing object. Catalog entries accept `detail.copilot` with `category` and `tags`; plugins accept `detail.opencode.packageName` to set the npm package name (for example a scoped name). Catalog details extend the catalog; entry details extend that catalog entry; plugin details extend its manifest. Codex plugin details become `extensions["com.openai"]` in portable `plugin.json`. Shared identity, source, version, and generated component paths cannot be overridden. Objects merge recursively, arrays replace, and null deletion is unsupported. Unknown fields fail validation; use the emitted schema to see supported details.
 
 Supported plugin detail paths stay inside the plugin, start with `./`, and must exist. Hooks may reference JSON files containing command hooks; unknown events, fields, and hook types are rejected. More vendor features require explicit schema/adapter support, not an arbitrary passthrough.
 
-Each output root receives `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`, and selected-target bundles under `plugins/<target>/<id>/`. Catalog references point to these generated bundles. Outputs cannot overlap canonical inputs, reserved directories, or other marketplace roots. Removed owned artifacts are removed only when unchanged; edited or unmanaged files are preserved with an error. Deselected targets remain untouched.
+Each output root receives `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`, `.github/plugin/marketplace.json`, and selected-target bundles under `plugins/<target>/<id>/`. Catalog references point to these generated bundles. OpenCode has no catalog: `plugins/opencode/<id>/` is an npm package (`package.json`, a fixed `index.js` loader for OpenCode 1 and 2, skills, and generated MCP data) that you publish to npm or install from Git; AnyAgents does neither. Copilot and OpenCode bundles carry skills, assets, scripts, and MCP only; `hooks/`, `agents/`, and `commands/` are not packaged for them and produce a warning. Outputs cannot overlap canonical inputs, reserved directories, or other marketplace roots. Removed owned artifacts are removed only when unchanged; edited or unmanaged files are preserved with an error. Deselected targets remain untouched.
 
 Validation is offline. Bundled Agent Plugins 1.0.0 JSON Schemas validate portable manifests and MCP. Marketplace documents, Claude manifests, supported vendor details, references, and hooks use explicitly maintained validators derived from vendor documentation. These are not complete official vendor schemas and do not prove live-client compatibility. Codex catalog policy and category are required explicitly; AnyAgents does not silently choose install/authentication policy.
 

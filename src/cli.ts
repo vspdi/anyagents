@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { MarketplaceError } from '@alchemisten/anyagents-marketplaces';
+import { MarketplaceError, targets } from '@alchemisten/anyagents-marketplaces';
 import { Command, CommanderError, Option } from 'commander';
 import { adapters, projectOutputs } from './adapters/targets.js';
 import { explanations, templates, version } from './content/docs.js';
@@ -15,14 +15,16 @@ import { schemas } from './formats/canonical.js';
 
 const program = new Command()
   .name('anyagents')
-  .description('Canonical AI assets for Claude Code and Codex.')
+  .description(
+    'Canonical AI assets for Claude Code, Codex, OpenCode, and GitHub Copilot.',
+  )
   .version(version)
   .option('--cwd <path>', 'project root')
   .option('--config <path>', 'explicit config path')
   .option('--source <path>', 'canonical source override')
   .option(
     '--target <target>',
-    'claude, codex, or all (repeatable or comma-separated)',
+    `${targets.join(', ')}, or all (repeatable or comma-separated)`,
     (value: string, previous: string[]) => [...previous, value],
     [],
   )
@@ -122,7 +124,9 @@ program
         marketplace.output,
       );
       for (const target of ctx.targets) {
-        const filename = path.join(root, adapters[target].catalogPath);
+        const catalogPath = adapters[target].catalogPath;
+        if (!catalogPath) continue;
+        const filename = path.join(root, catalogPath);
         await safePath(ctx.root, filename);
         rows.push({
           target,
@@ -175,7 +179,7 @@ program
     }
     const writableParents: Record<string, boolean> = {};
     for (const relative of [
-      ...(['claude', 'codex'] as const).flatMap((target) =>
+      ...targets.flatMap((target) =>
         projectOutputs(target).map((output) => output.path),
       ),
       '.anyagents/state.json',

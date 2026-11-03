@@ -1,6 +1,10 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  targets as allTargets,
+  type Target,
+} from '@alchemisten/anyagents-marketplaces';
+import {
   type Config,
   configSchema,
   unknownConfig,
@@ -9,7 +13,9 @@ import {
 import { yaml } from '../formats/yaml.js';
 import { fail } from './errors.js';
 import { exists, inside, safePath } from './filesystem.js';
-export type Target = 'claude' | 'codex';
+
+export type { Target };
+
 /** Directories that hold native outputs, state, or Git data. */
 const reservedDirs = ['.claude', '.agents', '.codex', '.anyagents', '.git'];
 export const overlapsReserved = (root: string, candidate: string): boolean =>
@@ -76,10 +82,10 @@ export async function context(options: Options): Promise<Context> {
     Object.entries(config.targets)
       .filter(([, enabled]) => enabled)
       .map(([name]) => name);
-  if (names.some((t) => !['claude', 'codex', 'all'].includes(t)))
-    fail('USAGE_ERROR', 'Target must be claude, codex, or all.');
+  if (names.some((t) => t !== 'all' && !allTargets.includes(t as Target)))
+    fail('USAGE_ERROR', `Target must be ${allTargets.join(', ')}, or all.`);
   const targets = (
-    names.includes('all') ? ['claude', 'codex'] : [...new Set(names)]
+    names.includes('all') ? [...allTargets] : [...new Set(names)]
   ) as Target[];
   return {
     root,

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const targets = ['claude', 'codex', 'opencode', 'copilot'] as const;
+export type Target = (typeof targets)[number];
+
 export const identifier = z
   .string()
   .max(64)
@@ -51,30 +54,50 @@ const policy = z
     authentication: z.enum(['ON_INSTALL', 'ON_USE']),
   })
   .strict();
-const detail = <C extends z.ZodType, O extends z.ZodType>(
-  claude: C,
-  codex: O,
-) =>
+/** Native-only fields, keyed by the targets that accept them. */
+const detail = <S extends { [K in Target]?: z.ZodType }>(shapes: S) =>
   z
-    .object({ claude: claude.optional(), codex: codex.optional() })
+    .object(
+      Object.fromEntries(
+        Object.entries(shapes).map(([target, shape]) => [
+          target,
+          (shape as z.ZodType).optional(),
+        ]),
+      ) as unknown as {
+        [K in keyof S]: z.ZodOptional<Extract<S[K], z.ZodType>>;
+      },
+    )
     .strict()
-    .default({});
+    .default({} as never);
+/** Target detail of a parsed definition, whichever targets define it. */
+export const detailOf = (
+  value: { detail: object },
+  target: Target,
+): Record<string, unknown> | undefined =>
+  (value.detail as Partial<Record<Target, Record<string, unknown>>>)[target];
+const npmName = z
+  .string()
+  .max(214)
+  .regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/);
 export const marketplaceReferenceSchema = z
   .object({ source: relative, output: relative })
   .strict();
 export const catalogEntrySchema = z
   .object({
     source: z.object({ kind: z.literal('local'), path: relative }).strict(),
-    detail: detail(
-      z
+    detail: detail({
+      claude: z
         .object({
           category: text.optional(),
           tags: strings.optional(),
           defaultEnabled: z.boolean().optional(),
         })
         .strict(),
-      z.object({ category: text, policy }).strict(),
-    ),
+      codex: z.object({ category: text, policy }).strict(),
+      copilot: z
+        .object({ category: text.optional(), tags: strings.optional() })
+        .strict(),
+    }),
   })
   .strict();
 export const marketplaceSchema = z
@@ -83,19 +106,19 @@ export const marketplaceSchema = z
     owner: person,
     description: text.optional(),
     plugins: z.record(identifier, catalogEntrySchema),
-    detail: detail(
-      z
+    detail: detail({
+      claude: z
         .object({
           forceRemoveDeletedPlugins: z.boolean().optional(),
           allowCrossMarketplaceDependenciesOn: strings.optional(),
         })
         .strict(),
-      z
+      codex: z
         .object({
           interface: z.object({ displayName: text }).strict().optional(),
         })
         .strict(),
-    ),
+    }),
   })
   .strict();
 export const pluginSchema = z
@@ -112,8 +135,8 @@ export const pluginSchema = z
     repository: z.url().optional(),
     license: text.optional(),
     keywords: strings.optional(),
-    detail: detail(
-      z
+    detail: detail({
+      claude: z
         .object({
           displayName: text.optional(),
           defaultEnabled: z.boolean().optional(),
@@ -129,17 +152,21 @@ export const pluginSchema = z
           commands: assetPath.optional(),
         })
         .strict(),
-      z
+      codex: z
         .object({
           interface: interfaceSchema.optional(),
           hooks: assetPath.optional(),
           onboardingSkill: assetPath.optional(),
         })
         .strict(),
-    ),
+      opencode: z.object({ packageName: npmName.optional() }).strict(),
+    }),
   })
   .strict();
-export const nativeCatalogSchema = (target: 'claude' | 'codex') =>
+const copilotOwner = z
+  .object({ name: text, email: z.email().optional() })
+  .strict();
+export const nativeCatalogSchema = (target: 'claude' | 'codex' | 'copilot') =>
   z
     .object({
       name: identifier,
@@ -150,24 +177,31 @@ export const nativeCatalogSchema = (target: 'claude' | 'codex') =>
             forceRemoveDeletedPlugins: z.boolean().optional(),
             allowCrossMarketplaceDependenciesOn: strings.optional(),
           }
-        : { interface: z.object({ displayName: text }).strict().optional() }),
+        : target === 'copilot'
+          ? {
+              owner: copilotOwner,
+              metadata: z.object({ description: text }).strict().optional(),
+            }
+          : { interface: z.object({ displayName: text }).strict().optional() }),
       plugins: z.array(
         z
           .object({
             name: identifier,
             source:
-              target === 'claude'
-                ? assetPath
-                : z
+              target === 'codex'
+                ? z
                     .object({ source: z.literal('local'), path: assetPath })
-                    .strict(),
+                    .strict()
+                : assetPath,
             ...(target === 'claude'
               ? {
                   category: text.optional(),
                   tags: strings.optional(),
                   defaultEnabled: z.boolean().optional(),
                 }
-              : { category: text, policy }),
+              : target === 'copilot'
+                ? { category: text.optional(), tags: strings.optional() }
+                : { category: text, policy }),
           })
           .strict(),
       ),
@@ -199,7 +233,6 @@ export const nativeClaudePluginSchema = z
   .strict();
 export type Marketplace = z.infer<typeof marketplaceSchema>;
 export type Plugin = z.infer<typeof pluginSchema>;
-export type Target = 'claude' | 'codex';
 /** Hook events accepted in plugin hook files. */
 export const hookEvents = [
   'SessionStart',

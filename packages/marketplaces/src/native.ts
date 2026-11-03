@@ -1,6 +1,7 @@
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { z } from 'zod';
 import {
+  detailOf,
   type Marketplace,
   nativeCatalogSchema,
   nativeClaudePluginSchema,
@@ -78,10 +79,12 @@ export const foldDetail = (
   }
   return merged;
 };
+/** Targets that publish a native catalog and an Agent Plugins or Claude bundle. */
+export type CatalogTarget = Exclude<Target, 'opencode'>;
 export const pluginManifest = (
   name: string,
   plugin: Plugin,
-  target: Target,
+  target: CatalogTarget,
 ): Record<string, unknown> => {
   const { version: _schemaVersion, release, detail, ...shared } = plugin;
   const base = { name, version: release, ...shared };
@@ -93,7 +96,9 @@ export const pluginManifest = (
   const result = {
     $schema: pluginJsonSchema.$id,
     ...base,
-    ...(detail.codex ? { extensions: { 'com.openai': detail.codex } } : {}),
+    ...(target === 'codex' && detail.codex
+      ? { extensions: { 'com.openai': detail.codex } }
+      : {}),
   };
   validateOfficial('plugin', result);
   return result;
@@ -101,7 +106,7 @@ export const pluginManifest = (
 export const catalogManifest = (
   name: string,
   catalog: Marketplace,
-  target: Target,
+  target: CatalogTarget,
 ): Record<string, unknown> => {
   const plugins = Object.entries(catalog.plugins)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -109,13 +114,16 @@ export const catalogManifest = (
       const path = `./plugins/${target}/${id}`;
       const base = {
         name: id,
-        source: target === 'claude' ? path : { source: 'local', path },
+        source: target === 'codex' ? { source: 'local', path } : path,
       };
       if (target === 'codex' && !entry.detail.codex)
         throw new MarketplaceError(
           `plugins.${id}.detail.codex requires category and policy.`,
         );
-      return foldDetail(base, entry.detail[target] ?? {}, ['name', 'source']);
+      return foldDetail(base, detailOf(entry, target) ?? {}, [
+        'name',
+        'source',
+      ]);
     });
   const base = {
     name,
@@ -124,15 +132,26 @@ export const catalogManifest = (
           owner: catalog.owner,
           ...(catalog.description ? { description: catalog.description } : {}),
         }
-      : {}),
+      : target === 'copilot'
+        ? {
+            owner: {
+              name: catalog.owner.name,
+              ...(catalog.owner.email ? { email: catalog.owner.email } : {}),
+            },
+            ...(catalog.description
+              ? { metadata: { description: catalog.description } }
+              : {}),
+          }
+        : {}),
     plugins,
   };
   return parseDefinition(
     nativeCatalogSchema(target),
-    foldDetail(base, catalog.detail[target] ?? {}, [
+    foldDetail(base, detailOf(catalog, target) ?? {}, [
       'name',
       'owner',
       'description',
+      'metadata',
       'plugins',
     ]),
   );
@@ -161,7 +180,7 @@ const replaceDeep = (value: unknown, from: string, to: string): unknown =>
  * Codex servers follow the Agent Plugins MCP schema.
  */
 export const pluginMcpDocument = <S extends PluginServer>(
-  target: Target,
+  target: CatalogTarget,
   servers: Record<string, S>,
   toClaude: (server: S) => Record<string, unknown>,
   path?: string,

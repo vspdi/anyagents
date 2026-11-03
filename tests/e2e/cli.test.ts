@@ -58,7 +58,7 @@ it('executes the complete bundled CLI workflow in a temporary Git repository', {
     expect(JSON.parse(run('explain', topic, '--json').stdout).topic).toBe(
       topic,
     );
-  for (const target of ['claude', 'codex'])
+  for (const target of ['claude', 'codex', 'opencode', 'copilot'])
     expect(run('explain', 'target', target).status).toBe(0);
   for (const topic of ['config', 'mcp', 'skill', 'all'])
     expect(JSON.parse(run('schema', topic).stdout)).toBeTruthy();
@@ -181,4 +181,59 @@ it('explains failures: missing roots are usage errors and --verbose shows causes
   });
   expect(run('--no-color', '--version').status).toBe(0);
   expect(run('--help').stdout).not.toContain('--no-color');
+});
+it('configures OpenCode and Copilot through the bundled CLI', {
+  timeout: 30_000,
+}, async () => {
+  const bad = run('apply', '--target', 'cursor', '--json');
+  expect(bad.status).toBe(2);
+  expect(JSON.parse(bad.stderr).message).toContain('opencode, copilot');
+  const initialized = run('init', '--target', 'all', '--json');
+  if (
+    initialized.status !== 0 &&
+    initialized.stderr.includes('LINK_UNSUPPORTED')
+  )
+    return;
+  expect(initialized.status, initialized.stderr).toBe(0);
+  const config = await fs.readFile(path.join(root, 'anyagents.yaml'), 'utf8');
+  expect(config).toContain('opencode: true');
+  expect(config).toContain('copilot: true');
+  expect(config).toContain('schema: v2');
+  expect(JSON.parse(run('describe', '--json').stdout).targets).toEqual([
+    'claude',
+    'codex',
+    'opencode',
+    'copilot',
+  ]);
+  await fs.writeFile(
+    path.join(root, '.ai/mcp.yaml'),
+    'version: 1\nmcp:\n  docs:\n    transport: http\n    url: https://example.invalid/mcp\n    headers:\n      Authorization: Bearer ${DOCS_TOKEN}\n',
+  );
+  expect(run('check', '--strict').status).toBe(1);
+  expect(run('apply').status).toBe(0);
+  const checked = run('check', '--strict', '--json');
+  expect(checked.status, checked.stdout).toBe(0);
+  expect(
+    JSON.parse(await fs.readFile(path.join(root, 'opencode.json'), 'utf8')),
+  ).toEqual({
+    $schema: 'https://opencode.ai/config.json',
+    mcp: {
+      servers: {
+        docs: {
+          type: 'remote',
+          url: 'https://example.invalid/mcp',
+          headers: { Authorization: 'Bearer {env:DOCS_TOKEN}' },
+        },
+      },
+    },
+  });
+  expect(await fs.readFile(path.join(root, '.mcp.json'), 'utf8')).toContain(
+    '${DOCS_TOKEN}',
+  );
+  const status = JSON.parse(run('status', '--json').stdout).targets;
+  expect(status).toHaveLength(12);
+  expect(
+    status.every((row: { state: string }) => row.state !== 'missing'),
+  ).toBe(true);
+  expect(run('doctor', '--json').status).toBe(0);
 });

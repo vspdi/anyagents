@@ -1,23 +1,28 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  type CatalogTarget,
   catalogManifest,
+  detailOf,
   hooksSchema,
   type Marketplace,
   marketplaceSchema,
+  type OpencodeSkill,
+  opencodePackage,
   type Plugin,
   parseDefinition,
   pluginManifest,
   pluginMcpDocument,
   pluginSchema,
   type Target,
+  targets,
 } from '@alchemisten/anyagents-marketplaces';
 import { adapters } from '../adapters/targets.js';
 import { type Mcp, mcpSchema, skill, validate } from '../formats/canonical.js';
-import { claudeServer } from '../formats/native.js';
+import { claudeServer, opencodeServer } from '../formats/native.js';
 import { yaml } from '../formats/yaml.js';
 import { type Context, overlapsReserved } from './context.js';
-import { fail, warnPlaintextBearer } from './errors.js';
+import { fail, warn, warnPlaintextBearer } from './errors.js';
 import { exists, files, inside, pathIdentity, safePath } from './filesystem.js';
 
 export interface Artifact {
@@ -51,6 +56,10 @@ const pluginAssetDirs = [
   'agents',
   'commands',
 ];
+/** Claude and Codex components that Copilot and OpenCode bundles cannot carry. */
+const unmappedDirs = ['hooks', 'agents', 'commands'];
+const carriesAllAssets = (target: Target): boolean =>
+  target === 'claude' || target === 'codex';
 const slash = (value: string): string => value.split(path.sep).join('/');
 const json = (value: unknown): Buffer =>
   Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -236,6 +245,7 @@ function componentReferences(
       packaged: [...files, ...(claude?.commands ? [claude.commands] : [])],
     };
   }
+  if (target !== 'codex') return { files: [], packaged: [] };
   const codex = detail.codex;
   const files = [
     ...(codex?.hooks ? [codex.hooks] : []),
@@ -284,10 +294,26 @@ async function validateReferences(
         definitionPath,
       );
   }
-  const hooks = definition.detail[target]?.hooks;
-  if (hooks) await validateHooks(path.resolve(root, hooks));
+  const hooks = detailOf(definition, target)?.hooks;
+  if (typeof hooks === 'string') await validateHooks(path.resolve(root, hooks));
   const defaultHooks = path.join(root, 'hooks/hooks.json');
   if (await exists(defaultHooks)) await validateHooks(defaultHooks);
+}
+
+/** Skill metadata for the OpenCode loader, read from each SKILL.md. */
+async function opencodeSkills(plugin: LoadedPlugin): Promise<OpencodeSkill[]> {
+  const skillRoot = path.join(plugin.root, 'skills');
+  if (!(await exists(skillRoot))) return [];
+  const result: OpencodeSkill[] = [];
+  for (const entry of (await fs.readdir(skillRoot)).sort()) {
+    const { name, description } = skill(
+      await fs.readFile(path.join(skillRoot, entry, 'SKILL.md'), 'utf8'),
+      entry,
+      [],
+    );
+    result.push({ id: entry, name, description });
+  }
+  return result;
 }
 
 /** Native files for one plugin bundle, relative to the bundle root. */
@@ -300,21 +326,46 @@ async function packagePlugin(
   for (const file of plugin.contents) {
     const local = slash(path.relative(plugin.root, file));
     if (local === 'plugin.yaml' || local === 'mcp.yaml') continue;
+    if (!carriesAllAssets(target) && unmappedDirs.includes(local.split('/')[0]))
+      continue;
     result.push({
       local,
       content: await fs.readFile(file),
       mode: (await fs.stat(file)).mode,
     });
   }
+  if (target === 'opencode') {
+    const servers = Object.fromEntries(
+      Object.entries(plugin.mcp?.mcp ?? {})
+        .filter(([, server]) => server.enabled)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, server]) => [name, opencodeServer(server)]),
+    );
+    for (const generated of opencodePackage({
+      id: plugin.id,
+      plugin: plugin.definition,
+      skills: await opencodeSkills(plugin),
+      servers,
+      entries: [...new Set(result.map(({ local }) => local.split('/')[0]))],
+    }))
+      result.push(generated);
+    return result;
+  }
+  const catalogTarget: CatalogTarget = target;
   result.push({
     local: adapter.pluginManifestPath,
-    content: json(pluginManifest(plugin.id, plugin.definition, target)),
+    content: json(pluginManifest(plugin.id, plugin.definition, catalogTarget)),
   });
   if (plugin.mcp)
     result.push({
       local: adapter.pluginMcpPath,
       content: json(
-        pluginMcpDocument(target, plugin.mcp.mcp, claudeServer, plugin.mcpPath),
+        pluginMcpDocument(
+          catalogTarget,
+          plugin.mcp.mcp,
+          claudeServer,
+          plugin.mcpPath,
+        ),
       ),
     });
   return result;
@@ -350,7 +401,9 @@ export const marketplaceInputs = async (
   ctx: Context,
 ): Promise<MarketplaceInputs> => {
   const result: MarketplaceInputs = {
-    artifacts: { claude: [], codex: [] },
+    artifacts: Object.fromEntries(
+      targets.map((target) => [target, []]),
+    ) as unknown as Record<Target, Artifact[]>,
     sources: [],
     roots: [],
   };
@@ -380,16 +433,32 @@ export const marketplaceInputs = async (
       source,
     );
     for (const target of ctx.targets) {
-      add(target, path.join(output, adapters[target].catalogPath), {
-        content: json(catalogManifest(name, catalog, target)),
-      });
+      const catalogPath = adapters[target].catalogPath;
+      if (catalogPath && target !== 'opencode')
+        add(target, path.join(output, catalogPath), {
+          content: json(catalogManifest(name, catalog, target)),
+        });
       result.roots.push(path.join(output, 'plugins', target));
     }
     for (const [id, entry] of Object.entries(catalog.plugins).sort(byKey)) {
       const plugin = await loadPlugin(ctx, source, id, entry);
       pluginRoots.push(plugin.root);
       result.sources.push(...plugin.contents);
+      const unmapped = [
+        ...new Set(
+          plugin.contents
+            .map(
+              (file) => slash(path.relative(plugin.root, file)).split('/')[0],
+            )
+            .filter((dir) => unmappedDirs.includes(dir)),
+        ),
+      ];
       for (const target of ctx.targets) {
+        if (!carriesAllAssets(target) && unmapped.length)
+          warn(
+            ctx.warnings,
+            `Plugin ${id}: ${unmapped.join(', ')} are not packaged for ${target}.`,
+          );
         await validateReferences(ctx, plugin, target);
         const bundle = path.join(output, 'plugins', target, id);
         for (const { local, ...artifact } of await packagePlugin(

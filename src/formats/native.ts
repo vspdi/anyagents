@@ -1,6 +1,10 @@
+import type { Target } from '../core/context.js';
 import { fail } from '../core/errors.js';
 import type { Mcp, Server } from './canonical.js';
-export function claudeServer(server: Server): Record<string, unknown> {
+export function claudeServer(
+  server: Server,
+  client = 'Claude',
+): Record<string, unknown> {
   if (server.transport === 'http')
     return {
       type: 'http',
@@ -10,7 +14,7 @@ export function claudeServer(server: Server): Record<string, unknown> {
   if (server.cwd)
     fail(
       'CANONICAL_MCP_INVALID',
-      'Claude project MCP has no documented cwd field; omit cwd when targeting Claude.',
+      `${client} project MCP has no documented cwd field; omit cwd when targeting ${client}.`,
     );
   return {
     command: server.command,
@@ -79,19 +83,57 @@ export function codexServer(server: Server): Record<string, unknown> {
     ...(Object.keys(env_http_headers).length ? { env_http_headers } : {}),
   };
 }
+/** Copilot reads the portable `.mcp.json`, which expands headers but not URLs. */
+export function copilotServer(server: Server): Record<string, unknown> {
+  if (server.transport === 'http' && server.url.includes('${'))
+    fail('CANONICAL_MCP_INVALID', 'Copilot cannot expand URL placeholders.');
+  return claudeServer(server, 'Copilot');
+}
+
+const PLACEHOLDER = /\$\{(?!PLUGIN_ROOT\})([A-Za-z_][A-Za-z0-9_]*)\}/g;
+const opencodeValue = (value: string): string => {
+  const converted = value.replace(PLACEHOLDER, '{env:$1}');
+  if (converted.replaceAll('${PLUGIN_ROOT}', '').includes('${'))
+    fail(
+      'CANONICAL_MCP_INVALID',
+      'OpenCode supports ${NAME} placeholders only; defaults such as ${NAME:-value} are not available.',
+    );
+  return converted;
+};
+const opencodeValues = (values: Record<string, string>) =>
+  Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, opencodeValue(value)]),
+  );
+/** OpenCode servers have the same shape in both config schemas. */
+export function opencodeServer(server: Server): Record<string, unknown> {
+  if (server.transport === 'http')
+    return {
+      type: 'remote',
+      url: opencodeValue(server.url),
+      ...(server.headers ? { headers: opencodeValues(server.headers) } : {}),
+    };
+  return {
+    type: 'local',
+    command: [server.command, ...(server.args ?? [])].map(opencodeValue),
+    ...(server.env ? { environment: opencodeValues(server.env) } : {}),
+    ...(server.cwd ? { cwd: opencodeValue(server.cwd) } : {}),
+  };
+}
+
+const mappers: Record<Target, (server: Server) => Record<string, unknown>> = {
+  claude: claudeServer,
+  codex: codexServer,
+  copilot: copilotServer,
+  opencode: opencodeServer,
+};
 export function nativeServers(
   mcp: Mcp,
-  target: 'claude' | 'codex',
+  target: Target,
 ): Record<string, Record<string, unknown>> {
   return Object.fromEntries(
     Object.keys(mcp.mcp)
       .sort()
       .filter((name) => mcp.mcp[name].enabled)
-      .map((name) => [
-        name,
-        target === 'claude'
-          ? claudeServer(mcp.mcp[name])
-          : codexServer(mcp.mcp[name]),
-      ]),
+      .map((name) => [name, mappers[target](mcp.mcp[name])]),
   );
 }
