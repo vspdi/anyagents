@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { stringify } from 'yaml';
 import { context } from '../../src/core/context.js';
@@ -461,4 +462,265 @@ it('preserves desired artifacts across case-only Windows output changes', async 
     JSON.parse(await read('out/one/plugins/codex/review/plugin.json')).version,
   ).toBe('1.2.5');
   expect((await plan(await ctx(), true)).issues).toEqual([]);
+});
+
+const pluginMcp = stringify({
+  version: 1,
+  mcp: {
+    docs: {
+      transport: 'http',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer ${DOCS_TOKEN}' },
+    },
+    runner: {
+      transport: 'stdio',
+      command: 'node',
+      args: ['${PLUGIN_ROOT}/scripts/server.js'],
+      env: { TOKEN: '${TOKEN}' },
+    },
+  },
+});
+const withExtras = async () => {
+  await put('.ai/plugins/review/mcp.yaml', pluginMcp);
+  await put(
+    '.ai/plugins/review/scripts/server.js',
+    'process.stdout.write("ok");',
+  );
+  await put('.ai/plugins/review/hooks/hooks.json', '{"hooks":{}}');
+  await put('.ai/plugins/review/agents/helper.md', 'Helper.\n');
+};
+it('generates a Copilot catalog and Agent Plugins bundle that leaves out unmapped components', async () => {
+  await put(
+    '.ai/marketplace.yaml',
+    stringify({
+      ...catalog,
+      description: 'Team tools',
+      plugins: {
+        review: {
+          ...catalog.plugins.review,
+          detail: {
+            ...catalog.plugins.review.detail,
+            copilot: { category: 'Testing' },
+          },
+        },
+      },
+    }),
+  );
+  await withExtras();
+  const resolved = await ctx({ target: ['copilot'] });
+  await apply(resolved);
+  expect(JSON.parse(await read('.github/plugin/marketplace.json'))).toEqual({
+    name: 'personal',
+    owner: { name: 'Team' },
+    metadata: { description: 'Team tools' },
+    plugins: [
+      {
+        name: 'review',
+        source: './plugins/copilot/review',
+        category: 'Testing',
+      },
+    ],
+  });
+  expect(
+    JSON.parse(await read('plugins/copilot/review/plugin.json')),
+  ).toMatchObject({
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+    name: 'review',
+    version: '1.2.3',
+  });
+  expect(
+    JSON.parse(await read('plugins/copilot/review/mcp.json')).mcpServers,
+  ).toEqual({
+    docs: {
+      type: 'streamable-http',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer ${DOCS_TOKEN}' },
+    },
+    runner: {
+      type: 'stdio',
+      command: 'node',
+      args: ['${PLUGIN_ROOT}/scripts/server.js'],
+      env: { TOKEN: '${TOKEN}' },
+    },
+  });
+  expect(await read('plugins/copilot/review/skills/review/SKILL.md')).toContain(
+    'Review it.',
+  );
+  expect(
+    await exists(path.join(root, 'plugins/copilot/review/hooks')),
+  ).toBeNull();
+  expect(
+    await exists(path.join(root, 'plugins/copilot/review/agents')),
+  ).toBeNull();
+  expect(resolved.warnings).toContainEqual(
+    expect.stringContaining('agents, hooks are not packaged for copilot'),
+  );
+  expect((await plan(await ctx({ target: ['copilot'] }), true)).issues).toEqual(
+    [],
+  );
+  await fs.rm(path.join(root, '.anyagents'), { recursive: true });
+  expect((await plan(await ctx({ target: ['copilot'] }), true)).issues).toEqual(
+    [],
+  );
+});
+it('keeps both Claude and Copilot catalogs when selected together', async () => {
+  await apply(await ctx({ target: ['claude', 'copilot'] }));
+  const claude = JSON.parse(await read('.claude-plugin/marketplace.json'));
+  const copilot = JSON.parse(await read('.github/plugin/marketplace.json'));
+  expect(claude.plugins[0].source).toBe('./plugins/claude/review');
+  expect(copilot.plugins[0].source).toBe('./plugins/copilot/review');
+});
+it('generates an OpenCode package without a catalog', async () => {
+  await withExtras();
+  const resolved = await ctx({ target: ['opencode'] });
+  await apply(resolved);
+  const bundle = 'plugins/opencode/review';
+  expect(JSON.parse(await read(`${bundle}/package.json`))).toMatchObject({
+    name: 'review',
+    version: '1.2.3',
+    type: 'module',
+    files: ['index.js', 'anyagents.opencode.json', 'scripts', 'skills'],
+  });
+  expect(JSON.parse(await read(`${bundle}/anyagents.opencode.json`))).toEqual({
+    id: 'review',
+    skills: [{ id: 'review', name: 'review', description: 'Review code' }],
+    mcp: {
+      docs: {
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { Authorization: 'Bearer {env:DOCS_TOKEN}' },
+      },
+      runner: {
+        type: 'local',
+        command: ['node', '{plugin:root}/scripts/server.js'],
+        environment: { TOKEN: '{env:TOKEN}' },
+      },
+    },
+  });
+  expect(await read(`${bundle}/scripts/server.js`)).toContain('ok');
+  expect(await exists(path.join(root, `${bundle}/hooks`))).toBeNull();
+  expect(await exists(path.join(root, `${bundle}/agents`))).toBeNull();
+  for (const catalogPath of [
+    '.github',
+    '.claude-plugin',
+    '.agents',
+    'marketplace.json',
+  ])
+    expect(await exists(path.join(root, catalogPath))).toBeNull();
+  expect(resolved.warnings).toContainEqual(
+    expect.stringContaining('agents, hooks are not packaged for opencode'),
+  );
+  expect((await apply(await ctx({ target: ['opencode'] }))).operations).toEqual(
+    [],
+  );
+  expect(
+    (await plan(await ctx({ target: ['opencode'] }), true)).issues,
+  ).toEqual([]);
+});
+it('names the OpenCode package from the plugin detail', async () => {
+  await put(
+    '.ai/plugins/review/plugin.yaml',
+    stringify({
+      ...plugin,
+      detail: { opencode: { packageName: '@acme/review' } },
+    }),
+  );
+  await apply(await ctx({ target: ['opencode'] }));
+  expect(
+    JSON.parse(await read('plugins/opencode/review/package.json')).name,
+  ).toBe('@acme/review');
+});
+it('rejects invalid OpenCode and Copilot plugin details before writing', async () => {
+  for (const detail of [
+    { opencode: { packageName: 'Not Valid' } },
+    { copilot: { category: 'x' } },
+  ]) {
+    await put(
+      '.ai/plugins/review/plugin.yaml',
+      stringify({ ...plugin, detail }),
+    );
+    await expect(apply(await ctx({ target: ['all'] }))).rejects.toMatchObject({
+      code: 'MARKETPLACE_INVALID',
+    });
+  }
+  expect(await exists(path.join(root, 'plugins'))).toBeNull();
+});
+it('loads the generated OpenCode package in both host shapes without replacing user entries', async () => {
+  await withExtras();
+  await apply(await ctx({ target: ['opencode'] }));
+  const bundle = path.join(root, 'plugins/opencode/review');
+  const loaded = await import(
+    pathToFileURL(path.join(bundle, 'index.js')).href
+  );
+  const plugin = loaded.default;
+  expect(plugin.id).toBe('review');
+  vi.stubEnv('DOCS_TOKEN', 'secret');
+  vi.stubEnv('TOKEN', 'abc');
+  const skillFile = path.join(bundle, 'skills/review/SKILL.md');
+  const expectedServers = {
+    docs: {
+      type: 'remote',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer secret' },
+    },
+    runner: {
+      type: 'local',
+      command: ['node', `${bundle}/scripts/server.js`],
+      environment: { TOKEN: 'abc' },
+    },
+  };
+
+  const added: unknown[] = [];
+  const set: Record<string, unknown> = {};
+  const host = (skills: string[], servers: string[]) => ({
+    skill: {
+      transform: async (edit: (editor: unknown) => void) =>
+        edit({
+          get: (id: string) => (skills.includes(id) ? {} : undefined),
+          add: (skill: unknown) => added.push(skill),
+        }),
+    },
+    mcp: {
+      transform: async (edit: (editor: unknown) => void) =>
+        edit({
+          get: (name: string) => (servers.includes(name) ? {} : undefined),
+          set: (name: string, config: unknown) => {
+            set[name] = config;
+          },
+        }),
+    },
+  });
+  await plugin.setup(host([], []));
+  expect(added).toEqual([
+    {
+      id: 'review',
+      name: 'review',
+      description: 'Review code',
+      path: skillFile,
+      content: 'Review it.\n',
+    },
+  ]);
+  expect(set).toEqual(expectedServers);
+
+  added.length = 0;
+  for (const name of Object.keys(set)) delete set[name];
+  await plugin.setup(host(['review'], ['docs']));
+  expect(added).toEqual([]);
+  expect(Object.keys(set)).toEqual(['runner']);
+
+  const { config } = await plugin.server();
+  const settings: {
+    mcp: Record<string, unknown>;
+    skills?: { paths: string[] };
+  } = {
+    mcp: { docs: { type: 'remote', url: 'https://mine.example' } },
+  };
+  await config(settings);
+  await config(settings);
+  expect(settings.skills?.paths).toEqual([path.join(bundle, 'skills')]);
+  expect(settings.mcp.docs).toEqual({
+    type: 'remote',
+    url: 'https://mine.example',
+  });
+  expect(settings.mcp.runner).toEqual(expectedServers.runner);
 });

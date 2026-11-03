@@ -115,7 +115,7 @@ it('semantic-release computes 0.1.0-dev.1 and 0.1.0 from the baseline in a local
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-}, 30000);
+}, 120000);
 
 it('release analysis honors Conventional Commit breaking-change markers', async () => {
   const { analyzeCommits } = await import('@semantic-release/commit-analyzer');

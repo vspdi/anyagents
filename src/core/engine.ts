@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { targets as allTargets } from '@alchemisten/anyagents-marketplaces';
+import { applyEdits, modify, type ParseError, parse } from 'jsonc-parser';
 import { stringify } from 'smol-toml';
 import { z } from 'zod';
 import { adapters } from '../adapters/targets.js';
@@ -27,18 +29,22 @@ const record = z.record(z.string(), z.string());
 const targetState = z
   .object({ links: record, generated: record, servers: record })
   .strict();
+/** One optional entry per target, so state written by older versions stays valid. */
+const perTarget = <T extends z.ZodType>(schema: T) =>
+  z
+    .object(
+      Object.fromEntries(
+        allTargets.map((target) => [target, schema.optional()]),
+      ) as Record<(typeof allTargets)[number], z.ZodOptional<T>>,
+    )
+    .strict();
 const stateSchema = z
   .object({
     schemaVersion: z.literal(1),
     toolVersion: z.string(),
     sourceHash: z.string(),
-    marketplaces: z
-      .object({ claude: record.optional(), codex: record.optional() })
-      .strict()
-      .default({}),
-    managed: z
-      .object({ claude: targetState.optional(), codex: targetState.optional() })
-      .strict(),
+    marketplaces: perTarget(record).default({}),
+    managed: perTarget(targetState),
   })
   .strict();
 type State = z.infer<typeof stateSchema>;
@@ -66,6 +72,11 @@ interface Planning {
   plan: Plan;
   old: State;
   checking: boolean;
+  /**
+   * Digest of each project destination planned so far. Targets that share a
+   * destination, such as `AGENTS.md`, must agree on it and plan it once.
+   */
+  planned: Map<string, string>;
 }
 const STATE_PATH = '.anyagents/state.json';
 const GITIGNORE_BEGIN = '# BEGIN AnyAgents managed outputs';
@@ -103,13 +114,46 @@ async function loadState(ctx: Context): Promise<State> {
   return validate(stateSchema, raw, 'CONFIG_INVALID', p);
 }
 
+/** What any target recorded for a shared destination in the previous state. */
+const priorLink = (old: State, dest: string): string | undefined =>
+  Object.values(old.managed).find((state) => state?.links[dest] !== undefined)
+    ?.links[dest];
+const priorGenerated = (old: State, dest: string): string | undefined =>
+  Object.values(old.managed).find(
+    (state) => state?.generated[dest] !== undefined,
+  )?.generated[dest];
+
+/**
+ * Records a destination planned for this target. Returns false when an earlier
+ * target already planned the identical destination, which needs no second plan.
+ */
+function claimDestination(
+  { planned }: Planning,
+  dest: string,
+  digest: string,
+): boolean {
+  const key = pathIdentity(dest);
+  const earlier = planned.get(key);
+  if (earlier === undefined) {
+    planned.set(key, digest);
+    return true;
+  }
+  if (earlier !== digest)
+    fail(
+      'DESTINATION_CONFLICT',
+      'Selected targets disagree about a shared destination.',
+      dest,
+    );
+  return false;
+}
+
 /** Instruction and skills links for one target. */
 async function planLinks(
-  { ctx, plan, checking }: Planning,
+  planning: Planning,
   target: Target,
   managed: Managed,
-  previous: Managed | undefined,
 ): Promise<void> {
+  const { ctx, plan, checking, old } = planning;
   const adapter = adapters[target];
   for (const [dest, canonical] of [
     [adapter.instructionPath, 'AGENTS.md'],
@@ -122,6 +166,7 @@ async function planLinks(
       path.join(ctx.source, canonical),
     );
     managed.links[dest] = source;
+    if (!claimDestination(planning, dest, `link:${source}`)) continue;
     const stat = await exists(full);
     if (stat?.isSymbolicLink()) {
       const actual = await fs.readlink(full);
@@ -137,7 +182,7 @@ async function planLinks(
           'Link differs from canonical source.',
           dest,
         );
-      else if (actual !== previous?.links[dest])
+      else if (actual !== priorLink(old, dest))
         issue(
           plan,
           'DESTINATION_CONFLICT',
@@ -158,35 +203,181 @@ async function planLinks(
   }
 }
 
-/** Claude owns the whole `.mcp.json`; returns the desired file content. */
-function claudeMcp(
-  { ctx, plan }: Planning,
+type McpPlanner = (
+  planning: Planning,
   dest: string,
   current: string | null,
   servers: Record<string, Record<string, unknown>>,
   managed: Managed,
   previous: Managed | undefined,
-): string {
+) => string | null;
+
+/**
+ * Claude and Copilot own the whole `.mcp.json` and write identical content,
+ * so selecting both plans it once. Returns the desired file content.
+ */
+const wholeFileMcp: McpPlanner = (
+  planning,
+  dest,
+  current,
+  servers,
+  managed,
+) => {
+  const { ctx, plan, old } = planning;
   const output = `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`;
+  managed.generated[dest] = hash(output);
+  if (!claimDestination(planning, dest, `file:${hash(output)}`)) return output;
+  const prior = priorGenerated(old, dest);
   if (current !== null && current !== output) {
-    if (!previous?.generated[dest])
+    if (!prior)
       issue(
         plan,
         'DESTINATION_CONFLICT',
-        'Unmanaged Claude MCP file exists; move it first.',
+        'Unmanaged MCP file exists; move it first.',
         dest,
       );
-    else if (hash(current) !== previous.generated[dest] && !ctx.force)
+    else if (hash(current) !== prior && !ctx.force)
       issue(
         plan,
         'OUTPUT_DRIFT',
-        'Managed Claude MCP was edited. Restore it or use apply --force.',
+        'Managed MCP file was edited. Restore it or use apply --force.',
         dest,
       );
   }
-  managed.generated[dest] = hash(output);
   return output;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const OPENCODE_SCHEMA_URL = 'https://opencode.ai/config.json';
+const JSON_FORMAT = { insertSpaces: true, tabSize: 2, eol: '\n' };
+
+/** Value at a path in parsed JSON, or undefined when any segment is missing. */
+function valueAt(config: unknown, segments: string[]): unknown {
+  let value = config;
+  for (const segment of segments) {
+    if (!isRecord(value)) return undefined;
+    value = value[segment];
+  }
+  return value;
 }
+function serversAt(
+  config: unknown,
+  segments: string[],
+  dest: string,
+): Record<string, unknown> {
+  const value = valueAt(config, segments);
+  if (value === undefined) return {};
+  if (!isRecord(value))
+    fail('CONFIG_INVALID', 'OpenCode mcp must be an object.', dest);
+  return value;
+}
+
+/**
+ * OpenCode shares `opencode.json` with the user: only managed entries of the
+ * `mcp` object change, and comments stay. OpenCode 2 nests servers under
+ * `mcp.servers`; OpenCode 1 puts them directly under `mcp`.
+ */
+const opencodeMcp: McpPlanner = (
+  planning,
+  dest,
+  current,
+  servers,
+  managed,
+  previous,
+) => {
+  const { ctx, plan, checking } = planning;
+  const schema = ctx.config.opencode.schema;
+  const active = schema === 'v2' ? ['mcp', 'servers'] : ['mcp'];
+  const other = schema === 'v2' ? ['mcp'] : ['mcp', 'servers'];
+  managed.generated[dest] = hash(stable({ schema, servers }));
+  if (current === null && !Object.keys(servers).length) return null;
+  const errors: ParseError[] = [];
+  const config =
+    current === null
+      ? {}
+      : parse(current, errors, { allowTrailingComma: true });
+  if (errors.length || !isRecord(config))
+    fail(
+      'CONFIG_INVALID',
+      'Invalid OpenCode config; expected a JSON or JSONC object.',
+      dest,
+    );
+  const existing = serversAt(config, active, dest);
+  const stale = serversAt(config, other, dest);
+  let text = current ?? '{}';
+  const edit = (segments: string[], value: unknown) => {
+    text = applyEdits(
+      text,
+      modify(text, segments, value, { formattingOptions: JSON_FORMAT }),
+    );
+  };
+  if (current === null) edit(['$schema'], OPENCODE_SCHEMA_URL);
+  let removed = false;
+  for (const name of new Set([
+    ...Object.keys(previous?.servers ?? {}),
+    ...Object.keys(servers),
+  ])) {
+    const actual = Object.hasOwn(existing, name)
+      ? hash(stable(existing[name]))
+      : null;
+    const prior = previous?.servers[name];
+    const desired = managed.servers[name];
+    if (
+      actual !== null &&
+      actual !== desired &&
+      (!prior || (actual !== prior && !ctx.force))
+    )
+      issue(
+        plan,
+        prior ? 'OUTPUT_DRIFT' : 'DESTINATION_CONFLICT',
+        `OpenCode MCP entry ${name} is ${prior ? 'edited; restore it or use apply --force' : 'unmanaged; move it first'}.`,
+        dest,
+      );
+    if (checking && actual !== (desired ?? null))
+      issue(
+        plan,
+        'OUTPUT_DRIFT',
+        `OpenCode MCP entry ${name} differs. Run anyagents apply.`,
+        dest,
+      );
+    if (actual !== (desired ?? null)) {
+      if (Object.hasOwn(servers, name)) edit([...active, name], servers[name]);
+      else {
+        edit([...active, name], undefined);
+        removed = true;
+      }
+    }
+    if (
+      prior &&
+      Object.hasOwn(stale, name) &&
+      hash(stable(stale[name])) === prior
+    ) {
+      if (checking)
+        issue(
+          plan,
+          'OUTPUT_DRIFT',
+          `OpenCode MCP entry ${name} uses the other config layout. Run anyagents apply.`,
+          dest,
+        );
+      else {
+        edit([...other, name], undefined);
+        removed = true;
+      }
+    }
+  }
+  if (removed)
+    for (let depth = active.length; depth > 0; depth--) {
+      const segments = active.slice(0, depth);
+      const value = valueAt(
+        parse(text, [], { allowTrailingComma: true }),
+        segments,
+      );
+      if (!isRecord(value) || Object.keys(value).length) break;
+      edit(segments, undefined);
+    }
+  return current === null ? `${text}\n` : text;
+};
 
 /**
  * Codex shares `.codex/config.toml` with the user: only managed
@@ -261,6 +452,23 @@ function codexMcp(
   return edited.text;
 }
 
+const mcpPlanners: Record<Target, McpPlanner> = {
+  claude: wholeFileMcp,
+  copilot: wholeFileMcp,
+  codex: codexMcp,
+  opencode: opencodeMcp,
+};
+
+/** An existing `opencode.jsonc` is edited in place when there is no `opencode.json`. */
+async function mcpDestination(ctx: Context, target: Target): Promise<string> {
+  const { mcpPath } = adapters[target];
+  if (target !== 'opencode') return mcpPath;
+  return !(await exists(path.join(ctx.root, mcpPath))) &&
+    (await exists(path.join(ctx.root, 'opencode.jsonc')))
+    ? 'opencode.jsonc'
+    : mcpPath;
+}
+
 /** MCP configuration for one target; false when the destination is unusable. */
 async function planMcp(
   planning: Planning,
@@ -274,7 +482,7 @@ async function planMcp(
   const servers = adapter.servers(mcp);
   for (const [name, data] of Object.entries(servers))
     managed.servers[name] = hash(stable(data));
-  const dest = adapter.mcpPath;
+  const dest = await mcpDestination(ctx, target);
   const full = path.join(ctx.root, dest);
   await safePath(ctx.root, full);
   const stat = await exists(full);
@@ -290,7 +498,8 @@ async function planMcp(
   const current = stat
     ? (await fs.readFile(full, 'utf8')).replace(/\r\n/g, '\n')
     : null;
-  const output = (target === 'claude' ? claudeMcp : codexMcp)(
+  const shared = planning.planned.has(pathIdentity(dest));
+  const output = mcpPlanners[target](
     planning,
     dest,
     current,
@@ -298,6 +507,8 @@ async function planMcp(
     managed,
     previous,
   );
+  if (output === null || shared) return true;
+  const wholeFile = mcpPlanners[target] === wholeFileMcp;
   if (!checking) {
     if (current !== output)
       plan.operations.push({
@@ -307,7 +518,7 @@ async function planMcp(
       });
     return true;
   }
-  if (current === null || (target === 'claude' && current !== output))
+  if (current === null || (wholeFile && current !== output))
     issue(
       plan,
       'OUTPUT_DRIFT',
@@ -324,7 +535,7 @@ async function planProject(planning: Planning, mcp: Mcp): Promise<void> {
   for (const target of ctx.targets) {
     const managed: Managed = { links: {}, generated: {}, servers: {} };
     const previous = old.managed[target];
-    await planLinks(planning, target, managed, previous);
+    await planLinks(planning, target, managed);
     const usable = await planMcp(planning, target, mcp, managed, previous);
     if (usable && checking && previous && stable(previous) !== stable(managed))
       issue(
@@ -529,6 +740,7 @@ export async function plan(ctx: Context, checking = false): Promise<Plan> {
     ctx,
     old,
     checking,
+    planned: new Map(),
     plan: {
       operations: [],
       issues: [],

@@ -20,6 +20,8 @@ export async function init(ctx: Context, noApply = false) {
     targets: {
       claude: ctx.targets.includes('claude'),
       codex: ctx.targets.includes('codex'),
+      opencode: ctx.targets.includes('opencode'),
+      copilot: ctx.targets.includes('copilot'),
     },
   };
   const entries: [string, string][] = [

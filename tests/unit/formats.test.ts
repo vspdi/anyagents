@@ -17,7 +17,9 @@ import {
 import {
   claudeServer,
   codexServer,
+  copilotServer,
   nativeServers,
+  opencodeServer,
 } from '../../src/formats/native.js';
 
 describe('canonical formats and public documentation', () => {
@@ -25,7 +27,16 @@ describe('canonical formats and public documentation', () => {
     expect(configSchema.parse({ version: 1 }).targets).toEqual({
       claude: true,
       codex: true,
+      opencode: false,
+      copilot: false,
     });
+    expect(configSchema.parse({ version: 1 }).opencode).toEqual({
+      schema: 'v2',
+    });
+    expect(
+      configSchema.safeParse({ version: 1, opencode: { schema: 'v3' } })
+        .success,
+    ).toBe(false);
     for (const bad of [
       { version: 2 },
       { version: 1, links: { mode: 'copy' } },
@@ -61,6 +72,24 @@ describe('canonical formats and public documentation', () => {
         [],
       ),
     ).toThrow('YAML');
+  });
+  it('warns when a skill exceeds the name or description limits clients enforce', () => {
+    const warnings: string[] = [];
+    const name = 'a'.repeat(65);
+    skill(`---\nname: ${name}\ndescription: ok\n---\n`, name, warnings);
+    skill(
+      `---\nname: long\ndescription: ${'d'.repeat(1025)}\n---\n`,
+      'long',
+      warnings,
+    );
+    expect(warnings).toEqual([
+      expect.stringContaining('name exceeds 64'),
+      expect.stringContaining('description exceeds 1024'),
+    ]);
+    expect(skill(templates.skill, 'example', [])).toEqual({
+      name: 'example',
+      description: expect.any(String),
+    });
   });
   it('emitted JSON schemas agree with runtime validation for examples and invalid inputs', () => {
     const ajv = new Ajv({ strict: false });
@@ -169,6 +198,81 @@ describe('native mappings', () => {
       },
     }).mcp.test;
     expect(() => codexServer(server)).toThrow('placeholders');
+  });
+  it('maps STDIO and HTTP servers to OpenCode local and remote shapes', () => {
+    const { mcp } = mcpSchema.parse({
+      version: 1,
+      mcp: {
+        local: {
+          transport: 'stdio',
+          command: 'node',
+          args: ['server.js', '--flag'],
+          env: { TOKEN: '${TOKEN}', MODE: 'fast' },
+          cwd: 'tools',
+        },
+        remote: {
+          transport: 'http',
+          url: 'https://example.com/mcp',
+          headers: { Authorization: 'Bearer ${DOCS_TOKEN}' },
+        },
+        bare: { transport: 'stdio', command: 'tool' },
+      },
+    });
+    expect(opencodeServer(mcp.local)).toEqual({
+      type: 'local',
+      command: ['node', 'server.js', '--flag'],
+      environment: { TOKEN: '{env:TOKEN}', MODE: 'fast' },
+      cwd: 'tools',
+    });
+    expect(opencodeServer(mcp.remote)).toEqual({
+      type: 'remote',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer {env:DOCS_TOKEN}' },
+    });
+    expect(opencodeServer(mcp.bare)).toEqual({
+      type: 'local',
+      command: ['tool'],
+    });
+  });
+  it('refuses placeholder defaults OpenCode cannot express but keeps the plugin root token', () => {
+    const { mcp } = mcpSchema.parse({
+      version: 1,
+      mcp: {
+        defaulted: {
+          transport: 'http',
+          url: 'https://example.com',
+          headers: { Region: '${REGION:-eu}' },
+        },
+        bundled: {
+          transport: 'stdio',
+          command: 'node',
+          args: ['${PLUGIN_ROOT}/server.js'],
+        },
+      },
+    });
+    expect(() => opencodeServer(mcp.defaulted)).toThrow('defaults');
+    expect(opencodeServer(mcp.bundled).command).toEqual([
+      'node',
+      '${PLUGIN_ROOT}/server.js',
+    ]);
+  });
+  it('shares the Claude shape with Copilot but rejects what Copilot cannot expand', () => {
+    const { mcp } = mcpSchema.parse({
+      version: 1,
+      mcp: {
+        ok: {
+          transport: 'http',
+          url: 'https://example.com',
+          headers: { Authorization: 'Bearer ${TOKEN}' },
+        },
+        url: { transport: 'http', url: 'https://${HOST}/mcp' },
+        cwd: { transport: 'stdio', command: 'node', cwd: 'tools' },
+      },
+    });
+    expect(copilotServer(mcp.ok)).toEqual(claudeServer(mcp.ok));
+    expect(() => copilotServer(mcp.url)).toThrow('Copilot cannot expand URL');
+    expect(() => copilotServer(mcp.cwd)).toThrow('Copilot project MCP');
+    expect(() => claudeServer(mcp.cwd)).toThrow('Claude project MCP');
   });
   it('sorts names and omits disabled servers', () => {
     const mcp = mcpSchema.parse({

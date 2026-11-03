@@ -1,13 +1,13 @@
 # AnyAgents
 
-Keep Claude Code and Codex instructions, skills, and MCP server configuration in sync from one set of files in your repository.
+Keep Claude Code, Codex, OpenCode, and GitHub Copilot instructions, skills, and MCP server configuration in sync from one set of files in your repository.
 
 Write shared content in `.ai/`. AnyAgents links instructions and skills into each client's expected location and generates the corresponding MCP configuration.
 
 ## Requirements
 
 - Node.js 22.12 or later.
-- Claude Code, Codex, or both.
+- One or more of Claude Code, Codex, OpenCode, and GitHub Copilot CLI.
 - On Windows, symlink privileges, normally enabled through Developer Mode.
 
 ## Quick start
@@ -21,7 +21,7 @@ npx anyagents check
 
 `npx anyagents` downloads the latest release. To pin a version for your team and CI, add `anyagents` as an exact-version dev dependency; `npx anyagents` then runs the installed version.
 
-`init` creates the shared sources and project configuration, then applies them to Claude Code and Codex:
+`init` creates the shared sources and project configuration, then applies them to the enabled targets (Claude Code and Codex by default; add `--target all` or `--target opencode,copilot` for the others):
 
 ```text
 .ai/
@@ -58,13 +58,25 @@ See [installation alternatives](docs/installing.md) for tarballs and source buil
 
 ## What each client receives
 
-| Shared source | Claude Code | Codex |
-| --- | --- | --- |
-| `.ai/AGENTS.md` | `CLAUDE.md` symlink | `AGENTS.md` symlink |
-| `.ai/skills/` | `.claude/skills` directory symlink | `.agents/skills` directory symlink |
-| `.ai/mcp.yaml` | Generated `.mcp.json` | Managed entries in `.codex/config.toml` |
+| Shared source | Claude Code | Codex | OpenCode | GitHub Copilot |
+| --- | --- | --- | --- | --- |
+| `.ai/AGENTS.md` | `CLAUDE.md` symlink | `AGENTS.md` symlink | `AGENTS.md` symlink | `AGENTS.md` symlink |
+| `.ai/skills/` | `.claude/skills` directory symlink | `.agents/skills` directory symlink | `.agents/skills` directory symlink | `.agents/skills` directory symlink |
+| `.ai/mcp.yaml` | Generated `.mcp.json` | Managed entries in `.codex/config.toml` | Managed entries in `opencode.json` | Generated `.mcp.json` |
 
-Edit the shared sources rather than the linked or generated destinations. New skills appear through the directory links immediately. Your coding client may require project trust or MCP approval before using the configuration.
+Targets can share a destination: Codex, OpenCode, and Copilot all use `AGENTS.md` and `.agents/skills`, and Claude Code and Copilot write the same `.mcp.json`. Each shared file is planned once.
+
+`targets.claude` and `targets.codex` default to on; `targets.opencode` and `targets.copilot` default to off, so upgrading never writes new files.
+
+Edit the shared sources rather than the linked or generated destinations. New skills appear through the directory links immediately. Your coding client may require project trust or MCP approval before using the configuration; Copilot CLI loads project `.mcp.json` only after folder trust.
+
+### OpenCode
+
+OpenCode 2 nests MCP servers under `mcp.servers` in `opencode.json`; OpenCode 1 puts them directly under `mcp`. Set `opencode.schema` to `v2` (default) or `v1` in `anyagents.yaml` to match your OpenCode. AnyAgents edits only its managed servers: your other settings and comments in `opencode.json` (or an existing `opencode.jsonc`) stay. `${NAME}` placeholders become `{env:NAME}`; defaults such as `${NAME:-value}` cannot be expressed and fail. OpenCode starts its own OAuth flow for remote servers that answer 401, which AnyAgents does not disable.
+
+### GitHub Copilot
+
+Instructions are verified for Copilot CLI, which reads `AGENTS.md`; VS Code and GitHub.com instruction files are not covered. Project `.mcp.json` has no `cwd`, and Copilot does not expand placeholders in URLs, so those fail rather than produce broken output.
 
 ## Everyday commands
 
@@ -93,6 +105,15 @@ See the [CLI and project reference](docs/reference.md) for schemas, templates, t
 
 Configure one or more `marketplaces` entries in `anyagents.yaml`, each with a canonical YAML `source` and native `output` root. Set `project: false` for marketplace-only repositories. Each catalog references plugin directories with `plugin.yaml`, optional plugin-scoped `mcp.yaml`, and skills/assets. Local project MCP stays separate.
 
+| Target | Marketplace output |
+| --- | --- |
+| Claude Code | `.claude-plugin/marketplace.json` and bundles in `plugins/claude/<id>/` |
+| Codex | `.agents/plugins/marketplace.json` and bundles in `plugins/codex/<id>/` |
+| GitHub Copilot | `.github/plugin/marketplace.json` and Agent Plugins 1.0 bundles in `plugins/copilot/<id>/` |
+| OpenCode | No catalog. Each plugin becomes an npm package in `plugins/opencode/<id>/` (`package.json`, a fixed `index.js` loader for OpenCode 1 and 2, skills, generated MCP data) |
+
+AnyAgents only generates files. Publishing the OpenCode package to npm (or installing it from Git with `opencode plugin add`), registering marketplaces, and installing plugins are up to you. Copilot and OpenCode packages carry skills, assets, scripts, and MCP; `hooks/`, `agents/`, and `commands/` are not packaged for them and produce a warning. The OpenCode loader reads environment variables at startup to fill `{env:NAME}` placeholders in memory and never writes them to disk. Set `detail.opencode.packageName` in `plugin.yaml` for a scoped npm name.
+
 ```sh
 npx anyagents explain marketplaces
 npx anyagents explain plugins
@@ -106,7 +127,7 @@ npx anyagents check --strict
 
 AnyAgents runs locally. It does not execute MCP servers, resolve secrets, change global configuration, or run a background service. It has no telemetry. Review MCP commands and URLs before using them in your coding client, and use environment placeholders for credentials.
 
-Existing unrelated Codex settings and MCP entries are preserved. Native symlinks require filesystem support; unavailable privileges produce an actionable error. Live Claude Code and Codex sessions are not part of automated tests.
+Existing unrelated Codex settings and MCP entries are preserved. Native symlinks require filesystem support; unavailable privileges produce an actionable error. Live Claude Code, Codex, OpenCode, and GitHub Copilot sessions are not part of automated tests; OpenCode and Copilot output is verified against their documentation and fixtures only.
 
 ## Development
 

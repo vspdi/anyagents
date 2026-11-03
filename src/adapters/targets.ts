@@ -6,8 +6,8 @@ export interface TargetAdapter {
   instructionPath: string;
   skillsPath: string;
   mcpPath: string;
-  /** Relative to a marketplace output root. */
-  catalogPath: string;
+  /** Relative to a marketplace output root; null when the client has none. */
+  catalogPath: string | null;
   /** Relative to a generated plugin bundle. */
   pluginManifestPath: string;
   /** Relative to a generated plugin bundle. */
@@ -34,6 +34,26 @@ export const adapters: Record<Target, TargetAdapter> = {
     pluginManifestPath: 'plugin.json',
     pluginMcpPath: 'mcp.json',
     servers: (mcp) => nativeServers(mcp, 'codex'),
+  },
+  opencode: {
+    name: 'opencode',
+    instructionPath: 'AGENTS.md',
+    skillsPath: '.agents/skills',
+    mcpPath: 'opencode.json',
+    catalogPath: null,
+    pluginManifestPath: 'package.json',
+    pluginMcpPath: 'anyagents.opencode.json',
+    servers: (mcp) => nativeServers(mcp, 'opencode'),
+  },
+  copilot: {
+    name: 'copilot',
+    instructionPath: 'AGENTS.md',
+    skillsPath: '.agents/skills',
+    mcpPath: '.mcp.json',
+    catalogPath: '.github/plugin/marketplace.json',
+    pluginManifestPath: 'plugin.json',
+    pluginMcpPath: 'mcp.json',
+    servers: (mcp) => nativeServers(mcp, 'copilot'),
   },
 };
 /** Project outputs for one target, keyed by the canonical asset they come from. */

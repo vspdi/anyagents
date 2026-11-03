@@ -1,4 +1,5 @@
 import {
+  targets as allTargets,
   identifier,
   marketplaceReferenceSchema,
   marketplaceSchema,
@@ -20,8 +21,13 @@ export const configSchema = z.object({
     .object({
       claude: z.boolean().default(true),
       codex: z.boolean().default(true),
+      opencode: z.boolean().default(false),
+      copilot: z.boolean().default(false),
     })
-    .default({ claude: true, codex: true }),
+    .default({ claude: true, codex: true, opencode: false, copilot: false }),
+  opencode: z
+    .object({ schema: z.enum(['v1', 'v2']).default('v2') })
+    .default({ schema: 'v2' }),
   links: z
     .object({ mode: z.literal('symlink').default('symlink') })
     .default({ mode: 'symlink' }),
@@ -100,11 +106,14 @@ export function validate<T>(
     );
   return result.data;
 }
+/** Limits of the Agent Skills format that OpenCode and Copilot enforce. */
+const SKILL_NAME_LIMIT = 64;
+const SKILL_DESCRIPTION_LIMIT = 1024;
 export function skill(
   text: string,
   directory: string,
   warnings: string[],
-): void {
+): { name: string; description: string } {
   const match = text
     .replace(/\r\n/g, '\n')
     .match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
@@ -132,11 +141,23 @@ export function skill(
   for (const key of Object.keys(metadata))
     if (!['name', 'description'].includes(key))
       warn(warnings, `Unknown skill field: ${directory}.${key}`);
+  if (metadata.name.length > SKILL_NAME_LIMIT)
+    warn(
+      warnings,
+      `Skill ${directory} name exceeds ${SKILL_NAME_LIMIT} characters; OpenCode and Copilot may not load it.`,
+    );
+  if (metadata.description.length > SKILL_DESCRIPTION_LIMIT)
+    warn(
+      warnings,
+      `Skill ${directory} description exceeds ${SKILL_DESCRIPTION_LIMIT} characters; OpenCode and Copilot may not load it.`,
+    );
+  return { name: metadata.name, description: metadata.description };
 }
 export function unknownConfig(raw: Record<string, unknown>): string[] {
   const allowed: Record<string, string[]> = {
     source: ['dir'],
-    targets: ['claude', 'codex'],
+    targets: [...allTargets],
+    opencode: ['schema'],
     links: ['mode'],
     git: ['managed_outputs'],
   };
