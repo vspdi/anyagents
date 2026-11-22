@@ -48,7 +48,7 @@
     "ajv-formats": "^3.0.1",
     "commander": "^15.0.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "semantic-release": "^25.0.9",
+    "semantic-release": "^26.0.1",
     "smol-toml": "^1.9.1",
     "tsup": "^9.0.0",
     "typescript": "^7.0.2",
